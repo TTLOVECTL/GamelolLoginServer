@@ -50,8 +50,10 @@
   <ItemGroup>
     <Compile Include="Database\BaseMessageDatabase.cs" />
     <Compile Include="Database\DatabaseConnnection.cs" />
+    <Compile Include="Database\InscriptionMessageDataBase.cs" />
     <Compile Include="Database\LoginMessageDatabase.cs" />
     <Compile Include="DataMessage\PlayerBaseMessage.cs" />
+    <Compile Include="DataMessage\PlayerInscriptionMessage.cs" />
     <Compile Include="DataMessage\PlayerLoginMessage.cs" />
     <Compile Include="LoginServer\LoginServerBuild.cs" />
     <Compile Include="Program.cs" />
