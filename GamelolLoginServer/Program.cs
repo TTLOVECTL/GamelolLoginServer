@@ -13,7 +13,7 @@ namespace GamelolLoginServer
     {
         static void Main(string[] args)
         {
-            //new BaseMessageDatabase().UpdatePlayerExperenceById(3,10000);
+            
         }
     }
 }
