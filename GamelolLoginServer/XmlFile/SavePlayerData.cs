@@ -45,7 +45,34 @@ namespace GamelolLoginServer.XmlFile
             List<PlayerInscriptionPageMessage> playerInscriptionPageMessage = new InscriptionPageMessageDatabase().GetInscriptionPageList(playerid);
             XmlNode node3 = xmlDoc.CreateNode(XmlNodeType.Element, "InscriptionPageMessage", null);
             foreach (PlayerInscriptionPageMessage item in playerInscriptionPageMessage) {
-                XmlNode nodeItem = CreateNode(xmlDoc, node2, "InscriptionPage", "");
+                XmlNode nodeItem = CreateNode(xmlDoc, node3, "InscriptionPage", "");
+                CreateNode(xmlDoc, nodeItem, "InscriptionPageId", item.InscriptionPageId.ToString());
+                CreateNode(xmlDoc, nodeItem, "InscriptionPageName", item.InscriptionPageName);
+                foreach (KeyValuePair<int, int> redItem in item.RedInscriptionList) {
+                    XmlElement  node4=(XmlElement)CreateNode(xmlDoc, nodeItem, "RedInscription", redItem.Value.ToString());
+                    node4.SetAttribute("SoitId",redItem.Key.ToString());
+                }
+                foreach (KeyValuePair<int, int> redItem in item.BlueInscriptionList)
+                {
+                    XmlElement node4 = (XmlElement)CreateNode(xmlDoc, nodeItem, "BlueInscription", redItem.Value.ToString());
+                    node4.SetAttribute("SoitId", redItem.Key.ToString());
+                }
+                foreach (KeyValuePair<int, int> redItem in item.GreenInscriptionList)
+                {
+                    XmlElement node4 = (XmlElement)CreateNode(xmlDoc, nodeItem, "GreenInscription", redItem.Value.ToString());
+                    node4.SetAttribute("SoitId", redItem.Key.ToString());
+                }
+            }
+            root.AppendChild(node3);
+
+            try
+            {
+                xmlDoc.Save("D://"+playerid.ToString()+".xml");
+            }
+            catch (Exception e)
+            {
+                //显示错误信息  
+                Console.WriteLine(e.Message);
             }
         }
 

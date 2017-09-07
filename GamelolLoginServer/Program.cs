@@ -13,7 +13,8 @@ namespace GamelolLoginServer
     {
         static void Main(string[] args)
         {
-            
+            new LoginServerBuild();
+            ///GamelolLoginServer.XmlFile.SavePlayerData.SavaDataToXml(1);
         }
     }
 }

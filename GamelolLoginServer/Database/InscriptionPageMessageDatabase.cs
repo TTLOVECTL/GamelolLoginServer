@@ -41,16 +41,16 @@ namespace GamelolLoginServer.Database
                     playerInscriptionPageMessage.InscriptionPageName = reader[3].ToString();
                     string[] redstring = reader[4].ToString().Split(new char[] { '/' });
                     for (int i = 0; i < redstring.Length; i++) { 
-                        playerInscriptionPageMessage.RedInscriptionList.Add(i,int.Parse(redstring[i]));
+                        playerInscriptionPageMessage.RedInscriptionList.Add(i+1,int.Parse(redstring[i]));
                     }
                    
                     string[] greenString = reader[5].ToString().Split(new char[] {'/'});
                     for (int i = 0; i < greenString.Length; i++) {
-                        playerInscriptionPageMessage.GreenInscriptionList.Add(i, int.Parse(greenString[i]));
+                        playerInscriptionPageMessage.GreenInscriptionList.Add(i+1, int.Parse(greenString[i]));
                     }
                     string[] blueString = reader[6].ToString().Split(new char[] { '/' });
                     for (int i = 0; i < blueString.Length; i++) {
-                        playerInscriptionPageMessage.BlueInscriptionList.Add(i, int.Parse(blueString[i]));
+                        playerInscriptionPageMessage.BlueInscriptionList.Add(i+1, int.Parse(blueString[i]));
                     }
                     inscriptionPageList.Add(playerInscriptionPageMessage);
                 }
