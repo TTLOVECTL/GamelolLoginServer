@@ -7,6 +7,9 @@ using MySql.Data.MySqlClient;
 using GamelolLoginServer.LoginServer;
 using GamelolLoginServer.DataMessage;
 using GamelolLoginServer.Database;
+using GamelolLoginServer.TextFile;
+using GamelolLoginServer.ServerLog.LogMessage;
+using GamelolLoginServer.ServerLog.LogSysytem;
 namespace GamelolLoginServer
 {
     class Program
@@ -14,7 +17,11 @@ namespace GamelolLoginServer
         static void Main(string[] args)
         {
             new LoginServerBuild();
-            ///GamelolLoginServer.XmlFile.SavePlayerData.SavaDataToXml(1);
+            //LoginLogMessage loginLogMessage = new LoginLogMessage();
+            //loginLogMessage.loginPlayerId = 1995;
+            //loginLogMessage.loginIP="192.168.6.114";
+            //LoginLogSystem.Instance.LoginLogWrite(loginLogMessage);
+               
         }
     }
 }

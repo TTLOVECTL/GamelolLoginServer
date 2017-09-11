@@ -12,6 +12,8 @@ namespace GamelolLoginServer.ServerLog.LogMessage
     [System.Serializable]
     public class LoginLogMessage
     {
+       
+
         /// <summary>
         ///登录时间
         /// </summary>
@@ -26,5 +28,13 @@ namespace GamelolLoginServer.ServerLog.LogMessage
         /// 登录的IP地址
         /// </summary>
         public string loginIP;
+
+        /// <summary>
+        /// 构造函数：自动获取当前时间
+        /// </summary>
+        public LoginLogMessage()
+        {
+            loginTime = DateTime.Now.ToString("yyyy-MM-dd") + "-" + DateTime.Now.ToString("hh:mm:ss");
+        }
     }
 }

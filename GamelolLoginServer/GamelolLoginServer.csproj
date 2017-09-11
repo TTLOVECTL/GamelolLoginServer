@@ -64,6 +64,8 @@
     <Compile Include="ServerLog\LogMessage\SystemLogMessage.cs" />
     <Compile Include="ServerLog\LogSysytem\LoginLogSystem.cs" />
     <Compile Include="ServerLog\LogType.cs" />
+    <Compile Include="TextFile\TextFileRead.cs" />
+    <Compile Include="TextFile\TextFileWrite.cs" />
     <Compile Include="TNet\Common\TNBuffer.cs" />
     <Compile Include="TNet\Common\TNDatagram.cs" />
     <Compile Include="TNet\Common\TNList.cs" />
