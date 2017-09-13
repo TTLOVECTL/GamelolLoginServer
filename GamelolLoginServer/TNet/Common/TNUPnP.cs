@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System;
 using System.IO;
@@ -9,11 +9,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Text;
-
-// Unity has an outdated version of Mono that doesn't have the NetworkInformation namespace.
-#if !UNITY_3_4 && !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2 && !UNITY_4_3 && !UNITY_4_5 && !UNITY_4_6
-using System.Net.NetworkInformation;
-#endif
 
 namespace TNet
 {
@@ -83,19 +78,7 @@ public class UPnP
 	/// Whether there are threads active.
 	/// </summary>
 
-	public bool hasThreadsActive { get { return mThreads.size > 0; } }
-
-	/// <summary>
-	/// Start the Universal Plug and Play lobby process.
-	/// </summary>
-
-	public UPnP ()
-	{
-		Thread th = new Thread(ThreadDiscover);
-		mDiscover = th;
-		mThreads.Add(th);
-		th.Start(th);
-	}
+	public bool hasThreadsActive { get { return mDiscover != null || mThreads.size > 0; } }
 
 	/// <summary>
 	/// Wait for all threads to finish.
@@ -114,12 +97,9 @@ public class UPnP
 			for (int i = mThreads.size; i > 0; )
 			{
 				Thread th = mThreads[--i];
-
-				if (th != mDiscover)
-				{
-					th.Abort();
-					mThreads.RemoveAt(i);
-				}
+				th.Interrupt();
+				th.Join();
+				mThreads.RemoveAt(i);
 			}
 		}
 
@@ -138,8 +118,19 @@ public class UPnP
 
 	public void WaitForThreads ()
 	{
-		for (int i = 0; mThreads.size > 0 && i < 2000; ++i)
-			Thread.Sleep(1);
+		System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+		sw.Start();
+
+		while (mDiscover != null || mThreads.size > 0)
+		{
+			if (sw.ElapsedMilliseconds > 2000)
+			{
+				Tools.Print("UPnP.WaitForThreads() took too long -- aborting.");
+				break;
+			}
+			Thread.Sleep(10);
+		}
+		sw.Stop();
 	}
 
 	/// <summary>
@@ -148,8 +139,6 @@ public class UPnP
 
 	void ThreadDiscover (object obj)
 	{
-		Thread th = (Thread)obj;
-
 		string request = "M-SEARCH * HTTP/1.1\r\n" +
 						"HOST: 239.255.255.250:1900\r\n" +
 						"ST:upnp:rootdevice\r\n" +
@@ -157,74 +146,56 @@ public class UPnP
 						"MX:3\r\n\r\n";
 
 		byte[] requestBytes = Encoding.ASCII.GetBytes(request);
-		int port = 10000 + (int)(DateTime.Now.Ticks % 45000);
 		List<IPAddress> ips = Tools.localAddresses;
+		IPEndPoint searchEndpoint = new IPEndPoint(IPAddress.Parse("239.255.255.250"), 1900);
 
 		// UPnP discovery should happen on all network interfaces
 		for (int i = 0; i < ips.size; ++i)
 		{
 			IPAddress ip = ips[i];
-			mStatus = Status.Searching;
-			UdpClient receiver = null;
+			UdpClient sender = null;
 
 			try
 			{
-				UdpClient sender = new UdpClient(new IPEndPoint(ip, port));
+#if STANDALONE
+				Tools.Print("Checking UPnP status on " + ip + "...");
+#endif
+				sender = new UdpClient(new IPEndPoint(ip, 0));
+				sender.Client.ReceiveTimeout = 3000;
 
-				sender.Connect(IPAddress.Broadcast, 1900);
-				sender.Send(requestBytes, requestBytes.Length);
-				sender.Close();
-
-				receiver = new UdpClient(new IPEndPoint(ip, port));
-				receiver.Client.ReceiveTimeout = 3000;
-
-				IPEndPoint sourceAddress = new IPEndPoint(IPAddress.Any, 0);
+				// Send several requests due to the unreliable nature of UDP
+				for (int b = 0; b < 3; ++b) sender.Send(requestBytes, requestBytes.Length, searchEndpoint);
 
 				for (; ; )
 				{
-					byte[] data = receiver.Receive(ref sourceAddress);
+					IPEndPoint sourceAddress = new IPEndPoint(IPAddress.Any, 0);
+					byte[] data = sender.Receive(ref sourceAddress);
 
 					if (ParseResponse(Encoding.ASCII.GetString(data, 0, data.Length)))
 					{
-						receiver.Close();
+						sender.Close();
+						sender = null;
 
-						lock (mThreads)
-						{
-							mGatewayAddress = sourceAddress.Address;
-#if UNITY_EDITOR
-							UnityEngine.Debug.Log("[TNet] UPnP Gateway: " + mGatewayAddress);
+						mGatewayAddress = sourceAddress.Address;
+#if STANDALONE
+						Tools.Print("UPnP Gateway: " + mGatewayAddress);
 #endif
-							mStatus = Status.Success;
-							mThreads.Remove(th);
-						}
+						mStatus = Status.Success;
 						mDiscover = null;
 						return;
 					}
 				}
 			}
-			catch (System.Exception) {}
+			catch (System.Exception) { if (sender != null) sender.Close(); }
 
-			if (receiver != null) receiver.Close();
-
-			lock (mThreads)
-			{
-				mStatus = Status.Failure;
-				mThreads.Remove(th);
-			}
-			mDiscover = null;
-
+			mStatus = Status.Failure;
+#if STANDALONE
+			Tools.Print("UPnP Gateway: Not found");
+#endif
 			// If we found one, we're done
 			if (mStatus == Status.Success) break;
 		}
-
-		if (mStatus != Status.Success)
-		{
-#if UNITY_EDITOR
-			UnityEngine.Debug.LogWarning("[TNet] UPnP discovery failed. TNet won't be able to open ports automatically.");
-#else
-			Console.WriteLine("UPnP discovery failed. TNet won't be able to open ports automatically.");
-#endif
-		}
+		mDiscover = null;
 	}
 
 	/// <summary>
@@ -359,42 +330,69 @@ public class UPnP
 	public void OpenUDP (int port, OnPortRequest callback) { Open(port, false, callback); }
 
 	/// <summary>
+	/// Start UPnP and attempt to find the gateway.
+	/// If you want to pause until the gateway is discovered, use WaitForThreads().
+	/// </summary>
+
+	public void Start ()
+	{
+		if (mStatus == Status.Inactive)
+		{
+			mStatus = Status.Searching;
+			mDiscover = new Thread(ThreadDiscover);
+			mDiscover.Start(mDiscover);
+		}
+	}
+
+	/// <summary>
 	/// Open up a port on the gateway.
 	/// </summary>
 
 	void Open (int port, bool tcp, OnPortRequest callback)
 	{
-		int id = (port << 8) | (tcp ? 1 : 0);
-
-		if (port > 0 && !mPorts.Contains(id) && mStatus != Status.Failure)
+		if (port > 0)
 		{
-			string addr = Tools.localAddress.ToString();
-			if (addr == "127.0.0.1") return;
+			int id = (port << 8) | (tcp ? 1 : 0);
 
-			mPorts.Add(id);
+			if (!mPorts.Contains(id) && mStatus != Status.Failure)
+			{
+				if (mStatus == Status.Inactive)
+				{
+					Start();
+					WaitForThreads();
+				}
 
-			ExtraParams xp = new ExtraParams();
-			xp.callback = callback;
-			xp.port = port;
-			xp.protocol = tcp ? ProtocolType.Tcp : ProtocolType.Udp;
-			xp.action = "AddPortMapping";
-			xp.request = "<NewRemoteHost></NewRemoteHost>\n" +
-				"<NewExternalPort>" + port + "</NewExternalPort>\n" +
-				"<NewProtocol>" + (tcp ? "TCP" : "UDP") + "</NewProtocol>\n" +
-				"<NewInternalPort>" + port + "</NewInternalPort>\n" +
-				"<NewInternalClient>" + addr + "</NewInternalClient>\n" +
-				"<NewEnabled>1</NewEnabled>\n" +
-				"<NewPortMappingDescription>" + name + "</NewPortMappingDescription>\n" +
-				"<NewLeaseDuration>0</NewLeaseDuration>\n";
+				string addr = Tools.localAddress.ToString();
+				if (addr == "127.0.0.1") return;
 
-			xp.th = new Thread(OpenRequest);
-			lock (mThreads) mThreads.Add(xp.th);
-			xp.th.Start(xp);
+#if UNITY_EDITOR
+				UnityEngine.Debug.Log("Opening " + (tcp ? "TCP" : "UDP") + " port " + port);
+#endif
+				mPorts.Add(id);
+
+				ExtraParams xp = new ExtraParams();
+				xp.callback = callback;
+				xp.port = port;
+				xp.protocol = tcp ? ProtocolType.Tcp : ProtocolType.Udp;
+				xp.action = "AddPortMapping";
+				xp.request = "<NewRemoteHost></NewRemoteHost>\n" +
+					"<NewExternalPort>" + port + "</NewExternalPort>\n" +
+					"<NewProtocol>" + (tcp ? "TCP" : "UDP") + "</NewProtocol>\n" +
+					"<NewInternalPort>" + port + "</NewInternalPort>\n" +
+					"<NewInternalClient>" + addr + "</NewInternalClient>\n" +
+					"<NewEnabled>1</NewEnabled>\n" +
+					"<NewPortMappingDescription>" + name + "</NewPortMappingDescription>\n" +
+					"<NewLeaseDuration>0</NewLeaseDuration>\n";
+
+				xp.th = new Thread(OpenRequest);
+				lock (mThreads) mThreads.Add(xp.th);
+				xp.th.Start(xp);
+				return;
+			}
 		}
-		else if (callback != null)
-		{
+
+		if (callback != null)
 			callback(this, port, tcp ? ProtocolType.Tcp : ProtocolType.Udp, false);
-		}
 	}
 
 	/// <summary>

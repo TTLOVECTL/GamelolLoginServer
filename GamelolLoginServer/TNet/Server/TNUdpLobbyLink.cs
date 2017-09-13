@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System;
 using System.IO;
@@ -91,7 +91,14 @@ public class UdpLobbyServerLink : LobbyServerLink
 
 		for (; ; )
 		{
-			long time = DateTime.Now.Ticks / 10000;
+#if !STANDALONE
+			if (TNManager.isPaused)
+			{
+				Thread.Sleep(500);
+				continue;
+			}
+#endif
+			long time = DateTime.UtcNow.Ticks / 10000;
 
 			if (mShutdown)
 			{

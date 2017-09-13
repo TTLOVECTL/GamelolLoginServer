@@ -10,14 +10,19 @@ namespace GamelolLoginServer.LoginServer
 {
     public class LoginServerBuild
     {
-        public LoginServerBuild() {
+        UPnP mUPnP = null;
+        GameServer mGameServer = null;
+        LobbyServer mLobbyServer = null;
+        public LoginServerBuild()
+        {
             IninGameServer();
         }
 
-        private void IninGameServer() {
+        private void IninGameServer()
+        {
 
             string name = "TNet Server";
-            int tcpPort = 1995;
+            int tcpPort = 1998;
             int udpPort = 1996;
             string lobbyAddress = null;
             int lobbyPort = 1997;
@@ -29,42 +34,34 @@ namespace GamelolLoginServer.LoginServer
         private void Start(string name, int tcpPort, int udpPort, string lobbyAddress, int lobbyPort, bool useTcp)
         {
             List<IPAddress> ips = Tools.localAddresses;
-            string text = "Local IPs: " + ips.size;
+            string text = "\nLocal IPs: " + ips.size;
 
             for (int i = 0; i < ips.size; ++i)
             {
                 text += "\n  " + (i + 1) + ": " + ips[i];
                 if (ips[i] == TNet.Tools.localAddress) text += " (Primary)";
             }
+
             Console.WriteLine(text + "\n");
-
             {
-                UPnP up = new UPnP();
-                up.WaitForThreads();
+             
+                mUPnP = new UPnP();
+                mUPnP.Start();
+                mUPnP.WaitForThreads();
 
-                if (up.status == UPnP.Status.Success)
-                {
-                    Console.WriteLine("Gateway:  " + up.gatewayAddress + "\n");
-                }
-                else
-                {
-                    Console.WriteLine("Gateway:  None found\n");
-                    up = null;
-                }
-
-                GameServer gameServer = null;
-                LobbyServer lobbyServer = null;
+                Tools.Print("External IP: " + Tools.externalAddress);
 
                 if (tcpPort > 0)
                 {
-                    gameServer = new GameServer();
-                    gameServer.name = name;
+                    mGameServer = new GameServer();
+                    mGameServer.name = name;
 
                     if (!string.IsNullOrEmpty(lobbyAddress))
                     {
+                        // Remote lobby address specified, so the lobby link should point to a remote location
                         IPEndPoint ip = Tools.ResolveEndPoint(lobbyAddress, lobbyPort);
-                        if (useTcp) gameServer.lobbyLink = new TcpLobbyServerLink(ip);
-                        else gameServer.lobbyLink = new UdpLobbyServerLink(ip);
+                        if (useTcp) mGameServer.lobbyLink = new TcpLobbyServerLink(ip);
+                        else mGameServer.lobbyLink = new UdpLobbyServerLink(ip);
 
                     }
                     else if (lobbyPort > 0)
@@ -72,92 +69,85 @@ namespace GamelolLoginServer.LoginServer
                         // Server lobby port should match the lobby port on the client
                         if (useTcp)
                         {
-                            lobbyServer = new TcpLobbyServer();
-                            lobbyServer.Start(lobbyPort);
-                            if (up != null) up.OpenTCP(lobbyPort, OnPortOpened);
+                            mLobbyServer = new TcpLobbyServer();
+                            mLobbyServer.Start(lobbyPort);
+                            if (mUPnP.status != UPnP.Status.Failure) mUPnP.OpenTCP(lobbyPort, OnPortOpened);
                         }
                         else
                         {
-                            lobbyServer = new UdpLobbyServer();
-                            lobbyServer.Start(lobbyPort);
-                            if (up != null) up.OpenUDP(lobbyPort, OnPortOpened);
+                            mLobbyServer = new UdpLobbyServer();
+                            mLobbyServer.Start(lobbyPort);
+                            if (mUPnP.status != UPnP.Status.Failure) mUPnP.OpenUDP(lobbyPort, OnPortOpened);
                         }
 
-                        // Local lobby server
-                        gameServer.lobbyLink = new LobbyServerLink(lobbyServer);
+                        mGameServer.lobbyLink = new LobbyServerLink(mLobbyServer);
                     }
 
-                    // Start the actual game server and load the save file
-                    gameServer.Start(tcpPort, udpPort);
-                    gameServer.LoadFrom("server.dat");
+                    mGameServer.Start(tcpPort, udpPort);
+                    mGameServer.Load("server.dat");
                 }
                 else if (lobbyPort > 0)
                 {
                     if (useTcp)
                     {
-                        if (up != null) up.OpenTCP(lobbyPort, OnPortOpened);
-                        lobbyServer = new TcpLobbyServer();
-                        lobbyServer.Start(lobbyPort);
+                        if (mUPnP.status != UPnP.Status.Failure) mUPnP.OpenTCP(lobbyPort, OnPortOpened);
+                        mLobbyServer = new TcpLobbyServer();
+                        mLobbyServer.Start(lobbyPort);
                     }
                     else
                     {
-                        if (up != null) up.OpenUDP(lobbyPort, OnPortOpened);
-                        lobbyServer = new UdpLobbyServer();
-                        lobbyServer.Start(lobbyPort);
+                        if (mUPnP.status != UPnP.Status.Failure) mUPnP.OpenUDP(lobbyPort, OnPortOpened);
+                        mLobbyServer = new UdpLobbyServer();
+                        mLobbyServer.Start(lobbyPort);
                     }
                 }
 
-                // Open up ports on the router / gateway
-                if (up != null)
+                if (mUPnP.status != UPnP.Status.Failure)
                 {
-                    if (tcpPort > 0) up.OpenTCP(tcpPort, OnPortOpened);
-                    if (udpPort > 0) up.OpenUDP(udpPort, OnPortOpened);
+                    if (tcpPort > 0) mUPnP.OpenTCP(tcpPort, OnPortOpened);
+                    if (udpPort > 0) mUPnP.OpenUDP(udpPort, OnPortOpened);
+                    mUPnP.WaitForThreads();
                 }
+                AppDomain.CurrentDomain.ProcessExit += new EventHandler(delegate (object sender, EventArgs e) { Dispose(); });
 
-                for (; ; )
+
+            }
+
+             void OnPortOpened(UPnP up, int port, ProtocolType protocol, bool success)
+            {
+                if (success)
                 {
-                    Console.WriteLine("Press 'q' followed by ENTER when you want to quit.\n");
-                    string command = Console.ReadLine();
-                    if (command == "q") break;
+                    Tools.Print("UPnP: " + protocol.ToString().ToUpper() + " port " + port + " was opened successfully.");
                 }
-                Console.WriteLine("Shutting down...");
-
-                // Close all opened ports
-                if (up != null)
+                else
                 {
-                    up.Close();
-                    up.WaitForThreads();
-                    up = null;
+                    Tools.Print("UPnP: Unable to open " + protocol.ToString().ToUpper() + " port " + port);
                 }
+            }
 
+             void Dispose()
+            {
                 // Stop the game server
-                if (gameServer != null)
+                if (mGameServer != null)
                 {
-                    gameServer.SaveTo("server.dat");
-                    gameServer.Stop();
-                    gameServer = null;
+                    mGameServer.Stop();
+                    mGameServer = null;
                 }
 
                 // Stop the lobby server
-                if (lobbyServer != null)
+                if (mLobbyServer != null)
                 {
-                    lobbyServer.Stop();
-                    lobbyServer = null;
+                    mLobbyServer.Stop();
+                    mLobbyServer = null;
                 }
-            }
-            Console.WriteLine("There server has shut down. Press ENTER to terminate the application.");
-            Console.ReadLine();
-        }
 
-        private void OnPortOpened(UPnP up, int port, ProtocolType protocol, bool success)
-        {
-            if (success)
-            {
-                Console.WriteLine("UPnP: " + protocol.ToString().ToUpper() + " port " + port + " was opened successfully.");
-            }
-            else
-            {
-                Console.WriteLine("UPnP: Unable to open " + protocol.ToString().ToUpper() + " port " + port);
+                // Close all opened ports
+                if (mUPnP != null)
+                {
+                    mUPnP.Close();
+                    mUPnP.WaitForThreads();
+                    mUPnP = null;
+                }
             }
         }
     }

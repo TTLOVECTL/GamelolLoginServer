@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System;
 using System.IO;
@@ -19,27 +19,46 @@ namespace TNet
 public class UdpProtocol
 {
 	/// <summary>
-	/// When you have multiple network interfaces, it's often important to be able to specify
-	/// which interface will actually be used to send UDP messages. By default this will be set
-	/// to Tools.localAddress, but you can change it to be something else if you desire.
+	/// If 'true', TNet will use multicasting with new UDP sockets. If 'false', TNet will use broadcasting instead.
+	/// Multicasting is the suggested way to go as it supports multiple network interfaces properly.
+	/// It's important to set this prior to calling StartUDP or the change won't have any effect.
 	/// </summary>
 
-	static public IPAddress defaultNetworkInterface = IPAddress.Any;
+#if UNITY_IPHONE
+	static public bool useMulticasting = false;
+#else
+	static public bool useMulticasting = true;
+#endif
+
+	/// <summary>
+	/// When you have multiple network interfaces, it's often important to be able to specify
+	/// which interface will actually be used to send UDP messages. By default this will be set
+	/// to IPAddress.Any, but you can change it to be something else if you desire.
+	/// It's important to set this prior to calling StartUDP or the change won't have any effect.
+	/// </summary>
+
+	static public IPAddress defaultNetworkInterface = null;
 
 	// Port used to listen and socket used to send and receive
 	int mPort = -1;
 	Socket mSocket;
 	//List<UdpClient> mClients = new List<UdpClient>();
 
+#if !UNITY_WEBPLAYER
 	// Buffer used for receiving incoming data
 	byte[] mTemp = new byte[8192];
 
-	// Buffer that's currently used to receive incoming data
-	EndPoint mEndPoint = new IPEndPoint(IPAddress.Any, 0);
+	// End point of where the data is coming from
+	EndPoint mEndPoint;
+	bool mMulticast = true;
 
-#if !UNITY_WEBPLAYER
+	// Default end point -- mEndPoint is reset to this value after every receive operation.
+	static EndPoint mDefaultEndPoint;
+
 	// Cached broadcast end-point
-	IPEndPoint mBroadcastIP = new IPEndPoint(IPAddress.Broadcast, 0);
+	static IPAddress multicastIP = IPAddress.Parse("224.168.100.17");
+	IPEndPoint mMulticastEndPoint = new IPEndPoint(multicastIP, 0);
+	IPEndPoint mBroadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, 0);
 #endif
 
 	// Incoming message queue
@@ -84,31 +103,43 @@ public class UdpProtocol
 
 		mPort = port;
 		mSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-		mSocket.MulticastLoopback = true;
 #if !UNITY_WEBPLAYER
 		// Web player doesn't seem to support broadcasts
-		mSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+		mSocket.MulticastLoopback = true;
+		mMulticast = useMulticasting;
 
-		//IPAddress group = IPAddress.Parse("224.168.100.17");
-		//List<IPAddress> ips = Tools.localAddresses;
+		try
+		{
+			if (useMulticasting)
+			{
+				List<IPAddress> ips = Tools.localAddresses;
 
-		//foreach (IPAddress ip in ips)
-		//{
-		//    MulticastOption opt = new MulticastOption(group, ip);
-		//    mSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, opt);
-		//}
+				foreach (IPAddress ip in ips)
+				{
+					MulticastOption opt = new MulticastOption(multicastIP, ip);
+					mSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, opt);
+				}
+			}
+			else mSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+		}
+		catch (System.Exception) { }
 #endif
 		// Port zero means we will be able to send, but not receive
 		if (mPort == 0) return true;
 
-		// Choose a specific network interface
-		if (defaultNetworkInterface == IPAddress.Any)
-			defaultNetworkInterface = Tools.localAddress;
-
 		try
 		{
+			// Use the default network interface if one wasn't explicitly chosen
+ #if (UNITY_IPHONE && !UNITY_EDITOR) //|| UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+			IPAddress networkInterface = useMulticasting ? multicastIP : (defaultNetworkInterface ?? IPAddress.Any);
+ #else
+			IPAddress networkInterface = defaultNetworkInterface ?? IPAddress.Any;
+ #endif
+			mEndPoint = new IPEndPoint(networkInterface, 0);
+			mDefaultEndPoint = new IPEndPoint(networkInterface, 0);
+
 			// Bind the socket to the specific network interface and start listening for incoming packets
-			mSocket.Bind(new IPEndPoint(defaultNetworkInterface, mPort));
+			mSocket.Bind(new IPEndPoint(networkInterface, mPort));
 			mSocket.BeginReceiveFrom(mTemp, 0, mTemp.Length, SocketFlags.None, ref mEndPoint, OnReceive, null);
 		}
 #if UNITY_EDITOR
@@ -119,7 +150,7 @@ public class UdpProtocol
 			return false;
 		}
 #elif DEBUG
-		catch (System.Exception ex) { Console.WriteLine("Udp.Start: " + ex.Message); Stop(); return false; }
+		catch (System.Exception ex) { Tools.Print("Udp.Start: " + ex.Message); Stop(); return false; }
 #else
 		catch (System.Exception) { Stop(); return false; }
 #endif
@@ -145,6 +176,7 @@ public class UdpProtocol
 		Buffer.Recycle(mOut);
 	}
 
+#if !UNITY_WEBPLAYER
 	/// <summary>
 	/// Receive incoming data.
 	/// </summary>
@@ -170,7 +202,7 @@ public class UdpProtocol
 			buffer.BeginWriting(false).Write(mTemp, 0, bytes);
 			buffer.BeginReading(4);
 
-			// See the note above. The 'endPoint', gets reassigned rather than updated.
+			// The 'endPoint', gets reassigned rather than updated.
 			Datagram dg = new Datagram();
 			dg.buffer = buffer;
 			dg.ip = (IPEndPoint)mEndPoint;
@@ -180,9 +212,19 @@ public class UdpProtocol
 		// Queue up the next receive operation
 		if (mSocket != null)
 		{
-			mSocket.BeginReceiveFrom(mTemp, 0, mTemp.Length, SocketFlags.None, ref mEndPoint, OnReceive, null);
+			mEndPoint = mDefaultEndPoint;
+
+			try
+			{
+				mSocket.BeginReceiveFrom(mTemp, 0, mTemp.Length, SocketFlags.None, ref mEndPoint, OnReceive, null);
+			}
+			catch (System.Exception ex)
+			{
+				Error(new IPEndPoint(Tools.localAddress, 0), ex.Message);
+			}
 		}
 	}
+#endif
 
 	/// <summary>
 	/// Extract the first incoming packet.
@@ -218,10 +260,11 @@ public class UdpProtocol
 
 	public void SendEmptyPacket (IPEndPoint ip)
 	{
-		Buffer buffer = Buffer.Create(false);
+		Buffer buffer = Buffer.Create();
 		buffer.BeginPacket(Packet.Empty);
 		buffer.EndPacket();
 		Send(buffer, ip);
+		buffer.Recycle();
 	}
 
 	/// <summary>
@@ -232,24 +275,23 @@ public class UdpProtocol
 	{
 		if (buffer != null)
 		{
-			buffer.MarkAsUsed();
 #if UNITY_WEBPLAYER || UNITY_FLASH
 #if UNITY_EDITOR
 			UnityEngine.Debug.LogError("[TNet] Sending broadcasts doesn't work in the Unity Web Player or Flash");
 #endif
 #else
-			mBroadcastIP.Port = port;
-			
+			IPEndPoint endPoint = mMulticast ? mMulticastEndPoint : mBroadcastEndPoint;
+			endPoint.Port = port;
+
 			try
 			{
-				mSocket.SendTo(buffer.buffer, buffer.position, buffer.size, SocketFlags.None, mBroadcastIP);
+				mSocket.SendTo(buffer.buffer, buffer.position, buffer.size, SocketFlags.None, endPoint);
 			}
 			catch (System.Exception ex)
 			{
 				Error(null, ex.Message);
 			}
 #endif
-			buffer.Recycle();
 		}
 	}
 
@@ -262,13 +304,10 @@ public class UdpProtocol
 		if (ip.Address.Equals(IPAddress.Broadcast))
 		{
 			Broadcast(buffer, ip.Port);
-			return;
 		}
-
-		buffer.MarkAsUsed();
-
-		if (mSocket != null)
+		else if (mSocket != null)
 		{
+			buffer.MarkAsUsed();
 			buffer.BeginReading();
 
 			lock (mOut)
@@ -280,17 +319,21 @@ public class UdpProtocol
 
 				if (mOut.Count == 1)
 				{
-					// If it's the first datagram, begin the sending process
-					mSocket.BeginSendTo(buffer.buffer, buffer.position, buffer.size,
-						SocketFlags.None, ip, OnSend, null);
+					try
+					{
+						// If it's the first datagram, begin the sending process
+						mSocket.BeginSendTo(buffer.buffer, buffer.position, buffer.size,
+							SocketFlags.None, ip, OnSend, null);
+					}
+					catch (Exception ex)
+					{
+						Tools.LogError(ex.Message + "\n" + ex.StackTrace);
+						buffer.Recycle();
+					}
 				}
 			}
 		}
-		else
-		{
-			buffer.Recycle();
-			throw new InvalidOperationException("The socket is null. Did you forget to call UdpProtocol.Start()?");
-		}
+		else Tools.LogError("The socket is null. Did you forget to call UdpProtocol.Start()?");
 	}
 
 	/// <summary>
@@ -310,9 +353,9 @@ public class UdpProtocol
 		{
 			bytes = 1;
 #if STANDALONE
-			Console.WriteLine(ex.Message);
+			Tools.Print(ex.Message);
 #else
-			//UnityEngine.Debug.Log("[TNet] " + ex.Message);
+			UnityEngine.Debug.Log("[TNet] OnSend: " + ex.Message);
 #endif
 		}
 

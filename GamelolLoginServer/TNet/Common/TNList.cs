@@ -1,9 +1,10 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System.Diagnostics;
+
 namespace TNet
 {
 /// <summary>
@@ -31,13 +32,13 @@ public class List<T> : TList
 	/// Direct access to the buffer. Note that you should not use its 'Length' parameter, but instead use List.size.
 	/// </summary>
 
-	public T[] buffer;
+	public volatile T[] buffer;
 
 	/// <summary>
 	/// Direct access to the buffer's size. Note that it's only public for speed and efficiency. You shouldn't modify it.
 	/// </summary>
 
-	public int size = 0;
+	public volatile int size = 0;
 
 	/// <summary>
 	/// For 'foreach' functionality.
@@ -80,7 +81,7 @@ public class List<T> : TList
 	/// Helper function that expands the size of the array, maintaining the content.
 	/// </summary>
 
-	void AllocateMore ()
+	public void AllocateMore ()
 	{
 		int max = (buffer == null) ? 0 : (buffer.Length << 1);
 		if (max < 32) max = 32;
@@ -94,7 +95,7 @@ public class List<T> : TList
 	/// Call this function only if you are sure that the buffer won't need to resize anytime soon.
 	/// </summary>
 
-	void Trim ()
+	public void Trim ()
 	{
 		if (size > 0)
 		{
@@ -141,6 +142,28 @@ public class List<T> : TList
 	}
 
 	/// <summary>
+	/// Add the specified item to the end of the list.
+	/// </summary>
+
+	public void Add (T item, bool unique)
+	{
+		if (unique && Contains(item)) return;
+		if (buffer == null || size == buffer.Length) AllocateMore();
+		buffer[size++] = item;
+	}
+
+	/// <summary>
+	/// Add the specified item to the end of the list.
+	/// </summary>
+
+	public void Add (object item, bool unique)
+	{
+		if (unique && Contains((T)item)) return;
+		if (buffer == null || size == buffer.Length) AllocateMore();
+		buffer[size++] = (T)item;
+	}
+
+	/// <summary>
 	/// Insert an item at the specified index, pushing the entries back.
 	/// </summary>
 
@@ -148,7 +171,7 @@ public class List<T> : TList
 	{
 		if (buffer == null || size == buffer.Length) AllocateMore();
 
-		if (index < size)
+		if (index > -1 && index < size)
 		{
 			for (int i = size; i > index; --i) buffer[i] = buffer[i - 1];
 			buffer[index] = item;
@@ -210,7 +233,7 @@ public class List<T> : TList
 
 	public void RemoveAt (int index)
 	{
-		if (buffer != null && index < size)
+		if (buffer != null && index > -1 && index < size)
 		{
 			--size;
 			buffer[index] = default(T);

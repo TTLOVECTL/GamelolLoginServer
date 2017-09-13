@@ -12,6 +12,21 @@
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile />
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -19,7 +34,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;STANDALONE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
@@ -34,12 +49,17 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="MySql.Data">
       <HintPath>..\..\..\..\..\Downloads\HoverTreeCSharpMysql\v4.5\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -66,16 +86,33 @@
     <Compile Include="ServerLog\LogType.cs" />
     <Compile Include="TextFile\TextFileRead.cs" />
     <Compile Include="TextFile\TextFileWrite.cs" />
+    <Compile Include="TNet\Common\DataNode.cs" />
     <Compile Include="TNet\Common\TNBuffer.cs" />
     <Compile Include="TNet\Common\TNDatagram.cs" />
+    <Compile Include="TNet\Common\TNFieldOrProperty.cs" />
     <Compile Include="TNet\Common\TNList.cs" />
     <Compile Include="TNet\Common\TNPacket.cs" />
     <Compile Include="TNet\Common\TNPlayer.cs" />
+    <Compile Include="TNet\Common\TNSerializer.cs" />
     <Compile Include="TNet\Common\TNServerList.cs" />
     <Compile Include="TNet\Common\TNTcpProtocol.cs" />
     <Compile Include="TNet\Common\TNTools.cs" />
     <Compile Include="TNet\Common\TNUdpProtocol.cs" />
     <Compile Include="TNet\Common\TNUPnP.cs" />
+    <Compile Include="TNet\Common\TypeExtensions.cs" />
+    <Compile Include="TNet\LZMA\CRC.cs" />
+    <Compile Include="TNet\LZMA\ICoder.cs" />
+    <Compile Include="TNet\LZMA\IMatchFinder.cs" />
+    <Compile Include="TNet\LZMA\LzBinTree.cs" />
+    <Compile Include="TNet\LZMA\LzInWindow.cs" />
+    <Compile Include="TNet\LZMA\LZMA.cs" />
+    <Compile Include="TNet\LZMA\LzmaBase.cs" />
+    <Compile Include="TNet\LZMA\LzmaDecoder.cs" />
+    <Compile Include="TNet\LZMA\LzmaEncoder.cs" />
+    <Compile Include="TNet\LZMA\LzOutWindow.cs" />
+    <Compile Include="TNet\LZMA\RangeCoder.cs" />
+    <Compile Include="TNet\LZMA\RangeCoderBit.cs" />
+    <Compile Include="TNet\LZMA\RangeCoderBitTree.cs" />
     <Compile Include="TNet\Server\TNChannel.cs" />
     <Compile Include="TNet\Server\TNFileServer.cs" />
     <Compile Include="TNet\Server\TNGameServer.cs" />
@@ -91,30 +128,24 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="TNet\Common\TNBuffer.cs.meta" />
-    <None Include="TNet\Common\TNDatagram.cs.meta" />
-    <None Include="TNet\Common\TNList.cs.meta" />
-    <None Include="TNet\Common\TNPacket.cs.meta" />
-    <None Include="TNet\Common\TNPlayer.cs.meta" />
-    <None Include="TNet\Common\TNServerList.cs.meta" />
-    <None Include="TNet\Common\TNTcpProtocol.cs.meta" />
-    <None Include="TNet\Common\TNTools.cs.meta" />
-    <None Include="TNet\Common\TNUdpProtocol.cs.meta" />
-    <None Include="TNet\Common\TNUPnP.cs.meta" />
-    <None Include="TNet\Server\TNChannel.cs.meta" />
-    <None Include="TNet\Server\TNFileServer.cs.meta" />
-    <None Include="TNet\Server\TNGameServer.cs.meta" />
-    <None Include="TNet\Server\TNLobbyLink.cs.meta" />
-    <None Include="TNet\Server\TNLobbyServer.cs.meta" />
-    <None Include="TNet\Server\TNTcpLobbyLink.cs.meta" />
-    <None Include="TNet\Server\TNTcpLobbyServer.cs.meta" />
-    <None Include="TNet\Server\TNTcpPlayer.cs.meta" />
-    <None Include="TNet\Server\TNUdpLobbyLink.cs.meta" />
-    <None Include="TNet\Server\TNUdpLobbyServer.cs.meta" />
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>

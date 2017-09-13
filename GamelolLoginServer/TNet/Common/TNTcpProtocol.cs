@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System;
 using System.IO;
@@ -9,6 +9,11 @@ using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading;
+using System.Text;
+
+#if UNITY_EDITOR
+using UnityEngine;
+#endif
 
 namespace TNet
 {
@@ -18,12 +23,19 @@ namespace TNet
 
 public class TcpProtocol : Player
 {
+	/// <summary>
+	/// Whether the hosted server will respond to HTTP GET requests.
+	/// </summary>
+
+	static public bool httpGetSupport = false;
+
 	public enum Stage
 	{
 		NotConnected,
 		Connecting,
 		Verifying,
 		Connected,
+		WebBrowser,
 	}
 
 	/// <summary>
@@ -48,8 +60,11 @@ public class TcpProtocol : Player
 	/// How long to allow this player to go without packets before disconnecting them.
 	/// This value is in milliseconds, so 1000 means 1 second.
 	/// </summary>
-
-	public long timeoutTime = 10000;
+#if UNITY_EDITOR
+	public long timeoutTime = 60000;
+#else
+	public long timeoutTime = 20000;
+#endif
 
 	// Incoming and outgoing queues
 	Queue<Buffer> mIn = new Queue<Buffer>();
@@ -77,6 +92,31 @@ public class TcpProtocol : Player
 	public bool isConnected { get { return stage == Stage.Connected; } }
 
 	/// <summary>
+	/// Socket used for communication.
+	/// </summary>
+
+	public Socket socket { get { return mSocket; } }
+
+	/// <summary>
+	/// If sockets are not used, an outgoing queue can be specified instead.
+	/// </summary>
+
+	public Queue<Buffer> sendQueue = null;
+
+	/// <summary>
+	/// Direct access to the incoming buffer to deposit messages in. Don't forget to lock it before using it.
+	/// </summary>
+
+	public Queue<Buffer> receiveQueue { get { return mIn; } }
+
+	/// <summary>
+	/// Whether the socket is currently connected. A socket can be connected while verifying the connection.
+	/// In most cases you should use 'isConnected' instead.
+	/// </summary>
+
+	public bool isSocketConnected { get { return mSocket != null && mSocket.Connected; } }
+
+	/// <summary>
 	/// Whether we are currently trying to establish a new connection.
 	/// </summary>
 
@@ -99,7 +139,9 @@ public class TcpProtocol : Player
 			if (mNoDelay != value)
 			{
 				mNoDelay = value;
+#if !UNITY_WINRT
 				mSocket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, mNoDelay);
+#endif
 			}
 		}
 	}
@@ -111,32 +153,32 @@ public class TcpProtocol : Player
 	public string address { get { return (tcpEndPoint != null) ? tcpEndPoint.ToString() : "0.0.0.0:0"; } }
 
 	/// <summary>
-	/// Try to establish a connection with the specified address.
-	/// </summary>
-
-	public void Connect (IPEndPoint externalIP) { Connect(externalIP, null); }
-
-	/// <summary>
 	/// Try to establish a connection with the specified remote destination.
 	/// </summary>
 
-	public void Connect (IPEndPoint externalIP, IPEndPoint internalIP)
+	public void Connect (IPEndPoint externalIP, IPEndPoint internalIP = null)
 	{
 		Disconnect();
 
-		// Some routers, like Asus RT-N66U don't support NAT Loopback, and connecting to an external IP
-		// will connect to the router instead. So if it's a local IP, connect to it first.
-		if (internalIP != null && Tools.GetSubnet(Tools.localAddress) == Tools.GetSubnet(internalIP.Address))
+		lock (mIn) Buffer.Recycle(mIn);
+		lock (mOut) Buffer.Recycle(mOut);
+
+		if (externalIP != null)
 		{
-			tcpEndPoint = internalIP;
-			mFallback = externalIP;
+			// Some routers, like Asus RT-N66U don't support NAT Loopback, and connecting to an external IP
+			// will connect to the router instead. So if it's a local IP, connect to it first.
+			if (internalIP != null && Tools.GetSubnet(Tools.localAddress) == Tools.GetSubnet(internalIP.Address))
+			{
+				tcpEndPoint = internalIP;
+				mFallback = externalIP;
+			}
+			else
+			{
+				tcpEndPoint = externalIP;
+				mFallback = internalIP;
+			}
+			ConnectToTcpEndPoint();
 		}
-		else
-		{
-			tcpEndPoint = externalIP;
-			mFallback = internalIP;
-		}
-		ConnectToTcpEndPoint();
 	}
 
 	/// <summary>
@@ -156,7 +198,7 @@ public class TcpProtocol : Player
 					mSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 					mConnecting.Add(mSocket);
 				}
-				
+
 				IAsyncResult result = mSocket.BeginConnect(tcpEndPoint, OnConnectResult, mSocket);
 				Thread th = new Thread(CancelConnect);
 				th.Start(result);
@@ -164,10 +206,10 @@ public class TcpProtocol : Player
 			}
 			catch (System.Exception ex)
 			{
-				Error(ex.Message);
+				RespondWithError(ex);
 			}
 		}
-		else Error("Unable to resolve the specified address");
+		else RespondWithError("Unable to resolve the specified address");
 		return false;
 	}
 
@@ -189,7 +231,7 @@ public class TcpProtocol : Player
 	void CancelConnect (object obj)
 	{
 		IAsyncResult result = (IAsyncResult)obj;
-
+#if !UNITY_WINRT
 		if (result != null && !result.AsyncWaitHandle.WaitOne(3000, true))
 		{
 			try
@@ -203,13 +245,13 @@ public class TcpProtocol : Player
 					lock (mConnecting)
 					{
 						// Last active connection attempt
-						if (mConnecting.size > 0 && mConnecting[mConnecting.size-1] == sock)
+						if (mConnecting.size > 0 && mConnecting[mConnecting.size - 1] == sock)
 						{
 							mSocket = null;
 
 							if (!ConnectToFallback())
 							{
-								Error("Unable to connect");
+								RespondWithError("Unable to connect");
 								Close(false);
 							}
 						}
@@ -219,6 +261,7 @@ public class TcpProtocol : Player
 			}
 			catch (System.Exception) { }
 		}
+#endif
 	}
 
 	/// <summary>
@@ -242,7 +285,9 @@ public class TcpProtocol : Player
 
 			try
 			{
+#if !UNITY_WINRT
 				sock.EndConnect(result);
+#endif
 			}
 			catch (System.Exception ex)
 			{
@@ -259,12 +304,14 @@ public class TcpProtocol : Player
 				BinaryWriter writer = BeginSend(Packet.RequestID);
 				writer.Write(version);
 				writer.Write(string.IsNullOrEmpty(name) ? "Guest" : name);
+				writer.Write(dataNode);
+
 				EndSend();
 				StartReceiving();
 			}
 			else if (!ConnectToFallback())
 			{
-				Error(errMsg);
+				RespondWithError(errMsg);
 				Close(false);
 			}
 		}
@@ -277,7 +324,7 @@ public class TcpProtocol : Player
 	/// Disconnect the player, freeing all resources.
 	/// </summary>
 
-	public void Disconnect ()
+	public void Disconnect (bool notify = false)
 	{
 		try
 		{
@@ -290,7 +337,16 @@ public class TcpProtocol : Player
 					if (sock != null) sock.Close();
 				}
 			}
-			if (mSocket != null) Close(mSocket.Connected);
+
+			if (mSocket != null)
+			{
+				Close(notify || mSocket.Connected);
+			}
+			else if (sendQueue != null)
+			{
+				Close(true);
+				sendQueue = null;
+			}
 		}
 		catch (System.Exception)
 		{
@@ -303,15 +359,16 @@ public class TcpProtocol : Player
 	/// Close the connection.
 	/// </summary>
 
-	public void Close (bool notify)
-	{
-		stage = Stage.NotConnected;
+	public void Close (bool notify) { lock (mOut) CloseNotThreadSafe(notify); }
 
-		if (mReceiveBuffer != null)
-		{
-			mReceiveBuffer.Recycle();
-			mReceiveBuffer = null;
-		}
+	/// <summary>
+	/// Close the connection.
+	/// </summary>
+
+	void CloseNotThreadSafe (bool notify)
+	{
+		Buffer.Recycle(mOut);
+		stage = Stage.NotConnected;
 
 		if (mSocket != null)
 		{
@@ -321,7 +378,6 @@ public class TcpProtocol : Player
 				mSocket.Close();
 			}
 			catch (System.Exception) {}
-
 			mSocket = null;
 
 			if (notify)
@@ -329,8 +385,33 @@ public class TcpProtocol : Player
 				Buffer buffer = Buffer.Create();
 				buffer.BeginPacket(Packet.Disconnect);
 				buffer.EndTcpPacketWithOffset(4);
-				lock (mIn) mIn.Enqueue(buffer);
+
+				lock (mIn)
+				{
+					Buffer.Recycle(mIn);
+					mIn.Enqueue(buffer);
+				}
 			}
+			else lock (mIn) Buffer.Recycle(mIn);
+		}
+		else if (notify && sendQueue != null)
+		{
+			sendQueue = null;
+			Buffer buffer = Buffer.Create();
+			buffer.BeginPacket(Packet.Disconnect);
+			buffer.EndTcpPacketWithOffset(4);
+
+			lock (mIn)
+			{
+				Buffer.Recycle(mIn);
+				mIn.Enqueue(buffer);
+			}
+		}
+
+		if (mReceiveBuffer != null)
+		{
+			mReceiveBuffer.Recycle();
+			mReceiveBuffer = null;
 		}
 	}
 
@@ -340,21 +421,8 @@ public class TcpProtocol : Player
 
 	public void Release ()
 	{
-		stage = Stage.NotConnected;
-
-		if (mSocket != null)
-		{
-			try
-			{
-				if (mSocket.Connected) mSocket.Shutdown(SocketShutdown.Both);
-				mSocket.Close();
-			}
-			catch (System.Exception) {}
-			mSocket = null;
-		}
-
-		Buffer.Recycle(mIn);
-		Buffer.Recycle(mOut);
+		lock (mOut) CloseNotThreadSafe(false);
+		dataNode = null;
 	}
 
 	/// <summary>
@@ -363,7 +431,7 @@ public class TcpProtocol : Player
 
 	public BinaryWriter BeginSend (Packet type)
 	{
-		mBuffer = Buffer.Create(false);
+		mBuffer = Buffer.Create();
 		return mBuffer.BeginPacket(type);
 	}
 
@@ -373,7 +441,7 @@ public class TcpProtocol : Player
 
 	public BinaryWriter BeginSend (byte packetID)
 	{
-		mBuffer = Buffer.Create(false);
+		mBuffer = Buffer.Create();
 		return mBuffer.BeginPacket(packetID);
 	}
 
@@ -383,9 +451,13 @@ public class TcpProtocol : Player
 
 	public void EndSend ()
 	{
-		mBuffer.EndPacket();
-		SendTcpPacket(mBuffer);
-		mBuffer = null;
+		if (mBuffer != null)
+		{
+			mBuffer.EndPacket();
+			SendTcpPacket(mBuffer);
+			mBuffer.Recycle();
+			mBuffer = null;
+		}
 	}
 
 	/// <summary>
@@ -395,32 +467,84 @@ public class TcpProtocol : Player
 	public void SendTcpPacket (Buffer buffer)
 	{
 		buffer.MarkAsUsed();
+		BinaryReader reader = buffer.BeginReading();
+
+#if DEBUG_PACKETS && !STANDALONE
+		Packet packet = (Packet)buffer.PeekByte(4);
+		if (packet != Packet.RequestPing && packet != Packet.ResponsePing)
+			UnityEngine.Debug.Log("Sending: " + packet + " to " + name + " (" + (buffer.size - 5).ToString("N0") + " bytes)");
+#endif
 
 		if (mSocket != null && mSocket.Connected)
 		{
-			buffer.BeginReading();
-
 			lock (mOut)
 			{
 				mOut.Enqueue(buffer);
 
+				// If it's the first packet, let's begin the send process
 				if (mOut.Count == 1)
 				{
 					try
 					{
-						// If it's the first packet, let's begin the send process
+#if !UNITY_WINRT
 						mSocket.BeginSend(buffer.buffer, buffer.position, buffer.size, SocketFlags.None, OnSend, buffer);
+#endif
 					}
 					catch (System.Exception ex)
 					{
-						Error(ex.Message);
-						Close(false);
-						Release();
+						mOut.Clear();
+						buffer.Recycle();
+						RespondWithError(ex);
+						CloseNotThreadSafe(false);
 					}
 				}
 			}
+			return;
 		}
-		else buffer.Recycle();
+		
+		if (sendQueue != null)
+		{
+			if (buffer.position != 0)
+			{
+				// Offline mode sends packets individually and they should not be reused
+#if UNITY_EDITOR
+				Debug.LogWarning("Packet's position is " + buffer.position + " instead of 0. Potentially sending the same packet more than once. Ignoring...");
+#endif
+				return;
+			}
+
+			// Skip the packet's size
+			int size = reader.ReadInt32();
+
+			if (size == buffer.size)
+			{
+				// Note that after this the buffer can no longer be used again as its offset is +4
+				lock (sendQueue) sendQueue.Enqueue(buffer);
+				return;
+			}
+
+			// Multi-part packet -- split it up into separate ones
+			lock (sendQueue)
+			{
+				for (;;)
+				{
+					byte[] bytes = reader.ReadBytes(size);
+
+					Buffer temp = Buffer.Create();
+					BinaryWriter writer = temp.BeginWriting();
+					writer.Write(size);
+					writer.Write(bytes);
+					temp.BeginReading(4);
+					temp.EndWriting();
+					sendQueue.Enqueue(temp);
+
+					if (buffer.size > 0) size = reader.ReadInt32();
+					else break;
+				}
+			}
+		}
+		
+		buffer.Recycle();
 	}
 
 	/// <summary>
@@ -431,43 +555,62 @@ public class TcpProtocol : Player
 	{
 		if (stage == Stage.NotConnected) return;
 		int bytes;
-		
+
 		try
 		{
+#if !UNITY_WINRT
 			bytes = mSocket.EndSend(result);
+			Buffer buff = (Buffer)result.AsyncState;
+
+			// If not everything was sent...
+			if (bytes < buff.size)
+			{
+				try
+				{
+					// Advance the position and send the rest
+					buff.position += bytes;
+					mSocket.BeginSend(buff.buffer, buff.position, buff.size, SocketFlags.None, OnSend, buff);
+					return;
+				}
+				catch (Exception ex)
+				{
+					RespondWithError(ex);
+					CloseNotThreadSafe(false);
+				}
+			}
+#endif
+			lock (mOut)
+			{
+				// The buffer has been sent and can now be safely recycled
+				Buffer b = (mOut.Count != 0) ? mOut.Dequeue() : null;
+				if (b != null) b.Recycle();
+
+#if !UNITY_WINRT
+				if (bytes > 0 && mSocket != null && mSocket.Connected)
+				{
+					// Nothing else left -- just exit
+					if (mOut.Count == 0) return;
+
+					try
+					{
+						Buffer next = mOut.Peek();
+						mSocket.BeginSend(next.buffer, next.position, next.size, SocketFlags.None, OnSend, next);
+					}
+					catch (Exception ex)
+					{
+						RespondWithError(ex);
+						CloseNotThreadSafe(false);
+					}
+				}
+				else CloseNotThreadSafe(true);
+#endif
+			}
 		}
 		catch (System.Exception ex)
 		{
 			bytes = 0;
 			Close(true);
-			Error(ex.Message);
-			return;
-		}
-
-		lock (mOut)
-		{
-			// The buffer has been sent and can now be safely recycled
-			mOut.Dequeue().Recycle();
-
-			if (bytes > 0 && mSocket != null && mSocket.Connected)
-			{
-				// If there is another packet to send out, let's send it
-				Buffer next = (mOut.Count == 0) ? null : mOut.Peek();
-
-				if (next != null)
-				{
-					try
-					{
-						mSocket.BeginSend(next.buffer, next.position, next.size, SocketFlags.None, OnSend, next);
-					}
-					catch (Exception ex)
-					{
-						Error(ex.Message);
-						Close(false);
-					}
-				}
-			}
-			else Close(true);
+			RespondWithError(ex);
 		}
 	}
 
@@ -491,24 +634,25 @@ public class TcpProtocol : Player
 
 		if (mSocket != null && mSocket.Connected)
 		{
-			// We are not verifying the connection
+			// We are now verifying the connection
 			stage = Stage.Verifying;
 
 			// Save the timestamp
-			lastReceivedTime = DateTime.Now.Ticks / 10000;
-
-			// Save the address
-			tcpEndPoint = (IPEndPoint)mSocket.RemoteEndPoint;
+			lastReceivedTime = DateTime.UtcNow.Ticks / 10000;
 
 			// Queue up the read operation
 			try
 			{
-				mSocket.BeginReceive(mTemp, 0, mTemp.Length, SocketFlags.None, OnReceive, null);
+				// Save the address
+				tcpEndPoint = (IPEndPoint)mSocket.RemoteEndPoint;
+#if !UNITY_WINRT
+				mSocket.BeginReceive(mTemp, 0, mTemp.Length, SocketFlags.None, OnReceive, mSocket);
+#endif
 			}
 			catch (System.Exception ex)
 			{
-				Error(ex.Message);
-				Disconnect();
+				if (!(ex is SocketException)) RespondWithError(ex);
+				Disconnect(true);
 			}
 		}
 	}
@@ -519,12 +663,12 @@ public class TcpProtocol : Player
 
 	public bool ReceivePacket (out Buffer buffer)
 	{
-		if (mIn.Count != 0)
+		lock (mIn)
 		{
-			lock (mIn)
+			if (mIn.Count != 0)
 			{
 				buffer = mIn.Dequeue();
-				return true;
+				return buffer != null;
 			}
 		}
 		buffer = null;
@@ -539,18 +683,23 @@ public class TcpProtocol : Player
 	{
 		if (stage == Stage.NotConnected) return;
 		int bytes = 0;
+		Socket socket = (Socket)result.AsyncState;
 
 		try
 		{
-			bytes = mSocket.EndReceive(result);
+#if !UNITY_WINRT
+			bytes = socket.EndReceive(result);
+#endif
+			if (socket != mSocket) return;
 		}
 		catch (System.Exception ex)
 		{
-			Error(ex.Message);
-			Disconnect();
+			if (socket != mSocket) return;
+			if (!(ex is SocketException)) RespondWithError(ex);
+			Disconnect(true);
 			return;
 		}
-		lastReceivedTime = DateTime.Now.Ticks / 10000;
+		lastReceivedTime = DateTime.UtcNow.Ticks / 10000;
 
 		if (bytes == 0)
 		{
@@ -562,12 +711,14 @@ public class TcpProtocol : Player
 
 			try
 			{
+#if !UNITY_WINRT
 				// Queue up the next read operation
-				mSocket.BeginReceive(mTemp, 0, mTemp.Length, SocketFlags.None, OnReceive, null);
+				mSocket.BeginReceive(mTemp, 0, mTemp.Length, SocketFlags.None, OnReceive, mSocket);
+#endif
 			}
 			catch (System.Exception ex)
 			{
-				Error(ex.Message);
+				if (!(ex is SocketException)) RespondWithError(ex);
 				Close(false);
 			}
 		}
@@ -585,6 +736,8 @@ public class TcpProtocol : Player
 			// Create a new packet buffer
 			mReceiveBuffer = Buffer.Create();
 			mReceiveBuffer.BeginWriting(false).Write(mTemp, 0, bytes);
+			mExpected = 0;
+			mOffset = 0;
 		}
 		else
 		{
@@ -599,9 +752,45 @@ public class TcpProtocol : Player
 			{
 				mExpected = mReceiveBuffer.PeekInt(mOffset);
 
-				if (mExpected < 0 || mExpected > 16777216)
+				// "GET " -- HTTP GET request sent by a web browser
+				if (mExpected == 542393671)
 				{
-					Close(true);
+					if (httpGetSupport)
+					{
+						if (stage == Stage.Verifying || stage == Stage.WebBrowser)
+						{
+							stage = Stage.WebBrowser;
+							string request = Encoding.ASCII.GetString(mReceiveBuffer.buffer, mOffset, available);
+							mReceiveBuffer.BeginPacket(Packet.RequestHTTPGet).Write(request);
+							mReceiveBuffer.EndPacket();
+							mReceiveBuffer.BeginReading(4);
+							lock (mIn) mIn.Enqueue(mReceiveBuffer);
+							mReceiveBuffer = null;
+							mExpected = 0;
+							mOffset = 0;
+						}
+						return true;
+					}
+
+					mReceiveBuffer.Recycle();
+					mReceiveBuffer = null;
+					mExpected = 0;
+					mOffset = 0;
+					Disconnect();
+					return false;
+				}
+				else if (mExpected < 0 || mExpected > 16777216)
+				{
+#if UNITY_EDITOR
+					UnityEngine.Debug.LogError("Malformed data packet: " + mOffset + ", " + available + " / " + mExpected);
+#else
+					Tools.LogError("Malformed data packet: " + mOffset + ", " + available + " / " + mExpected);
+#endif
+					mReceiveBuffer.Recycle();
+					mReceiveBuffer = null;
+					mExpected = 0;
+					mOffset = 0;
+					Disconnect();
 					return false;
 				}
 			}
@@ -630,7 +819,8 @@ public class TcpProtocol : Player
 				Buffer temp = Buffer.Create();
 
 				// Extract the packet and move past its size component
-				temp.BeginWriting(false).Write(mReceiveBuffer.buffer, mOffset, realSize);
+				BinaryWriter bw = temp.BeginWriting(false);
+				bw.Write(mReceiveBuffer.buffer, mOffset, realSize);
 				temp.BeginReading(4);
 
 				// This packet is now ready to be processed
@@ -647,16 +837,76 @@ public class TcpProtocol : Player
 	}
 
 	/// <summary>
-	/// Add an error packet to the incoming queue.
+	/// Log an error message.
 	/// </summary>
 
-	public void Error (string error) { Error(Buffer.Create(), error); }
+	public void LogError (string error, string stack = null, bool logInFile = true)
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.Append(name);
+		sb.Append(" (");
+		sb.Append(address);
+
+		if (aliases != null)
+			for (int i = 0; i < aliases.size; ++i)
+				sb.Append(", " + aliases.buffer[i]);
+
+		sb.Append("): ");
+		sb.Append(error);
+
+		Tools.LogError(sb.ToString(), stack, logInFile);
+	}
+
+	/// <summary>
+	/// Log an error message.
+	/// </summary>
+
+	public void Log (string msg, string stack = null, bool logInFile = true)
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.Append(name);
+		sb.Append(" (");
+		sb.Append(address);
+
+		if (aliases != null)
+			for (int i = 0; i < aliases.size; ++i)
+				sb.Append(", " + aliases.buffer[i]);
+
+		sb.Append("): ");
+		sb.Append(msg);
+
+		if (stack != null)
+		{
+			sb.Append("\n");
+			sb.Append(stack);
+		}
+		Tools.Log(sb.ToString(), logInFile);
+	}
 
 	/// <summary>
 	/// Add an error packet to the incoming queue.
 	/// </summary>
 
-	void Error (Buffer buffer, string error)
+	public void RespondWithError (string error) { RespondWithError(Buffer.Create(), error); }
+
+	/// <summary>
+	/// Add an error packet to the incoming queue.
+	/// </summary>
+
+	public void RespondWithError (Exception ex)
+	{
+#if UNITY_EDITOR
+		Debug.LogError(ex.Message + "\n" + ex.StackTrace);
+#endif
+		RespondWithError(Buffer.Create(), ex.Message);
+		LogError(ex.Message, ex.StackTrace, true);
+	}
+
+	/// <summary>
+	/// Add an error packet to the incoming queue.
+	/// </summary>
+
+	void RespondWithError (Buffer buffer, string error)
 	{
 		buffer.BeginPacket(Packet.Error).Write(error);
 		buffer.EndTcpPacketWithOffset(4);
@@ -664,39 +914,35 @@ public class TcpProtocol : Player
 	}
 
 	/// <summary>
-	/// Verify the connection.
+	/// Verify the connection. Returns 'true' if successful.
 	/// </summary>
 
-	public bool VerifyRequestID (Packet packet, BinaryReader reader, bool uniqueID)
+	public bool VerifyRequestID (BinaryReader reader, Buffer buffer, bool uniqueID)
 	{
-		if (packet == Packet.RequestID)
-		{
-			if (reader.ReadInt32() == version)
-			{
-				id = uniqueID ? Interlocked.Increment(ref mPlayerCounter) : 0;
-				name = reader.ReadString();
-				stage = TcpProtocol.Stage.Connected;
+		Packet request = (Packet)reader.ReadByte();
 
-				BinaryWriter writer = BeginSend(Packet.ResponseID);
-				writer.Write(version);
-				writer.Write(id);
-				EndSend();
-				return true;
-			}
-			else
+		if (request == Packet.RequestID)
+		{
+			int theirVer = reader.ReadInt32();
+
+			if (theirVer == version)
 			{
-				BinaryWriter writer = BeginSend(Packet.ResponseID);
-				writer.Write(version);
-				writer.Write(0);
-				EndSend();
-				Close(false);
+				if (uniqueID) lock (mLock) { id = ++mPlayerCounter; }
+				else id = 0;
+				name = reader.ReadString();
+				dataNode = reader.ReadDataNode();
+				stage = TcpProtocol.Stage.Connected;
+#if STANDALONE
+				if (id != 0) Tools.Log(name + " (" + address + "): Connected [" + id + "]");
+#endif
+				return true;
 			}
 		}
 		return false;
 	}
 
 	/// <summary>
-	/// Verify the connection.
+	/// Verify the connection. Returns 'true' if successful.
 	/// </summary>
 
 	public bool VerifyResponseID (Packet packet, BinaryReader reader)
@@ -705,7 +951,7 @@ public class TcpProtocol : Player
 		{
 			int serverVersion = reader.ReadInt32();
 
-			if (serverVersion == version)
+			if (serverVersion != 0 && serverVersion == version)
 			{
 				id = reader.ReadInt32();
 				stage = Stage.Connected;
@@ -714,12 +960,23 @@ public class TcpProtocol : Player
 			else
 			{
 				id = 0;
-				Error("Version mismatch! Server is running protocol version " + serverVersion + " while you are on version " + version);
+				RespondWithError("Version mismatch! Server is running a different protocol version!");
 				Close(false);
 				return false;
 			}
 		}
-		Error("Expected a response ID, got " + packet);
+		else if (packet == Packet.Error)
+		{
+			string text = reader.ReadString();
+			RespondWithError("Expected a response ID, got " + packet + ": " + text);
+			Close(false);
+#if UNITY_EDITOR
+			UnityEngine.Debug.LogWarning("[TNet] VerifyResponseID expected ResponseID, got " + packet + ": " + text);
+#endif
+			return false;
+		}
+
+		RespondWithError("Expected a response ID, got " + packet);
 		Close(false);
 #if UNITY_EDITOR
 		UnityEngine.Debug.LogWarning("[TNet] VerifyResponseID expected ResponseID, got " + packet);

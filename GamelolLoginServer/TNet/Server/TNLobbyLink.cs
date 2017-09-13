@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System.Net;
 using System.Threading;
@@ -26,7 +26,7 @@ public class LobbyServerLink
 	protected IPEndPoint mExternal;
 
 	// Thread-safe flag indicating that the server should shut down at the first available opportunity
-	protected bool mShutdown = false;
+	protected volatile bool mShutdown = false;
 
 	/// <summary>
 	/// Create a new local lobby server link. Expects a local server to work with.
@@ -55,11 +55,8 @@ public class LobbyServerLink
 		if (!mShutdown)
 		{
 			mShutdown = true;
-
 			if (mExternal != null && mLobby != null)
-			{
 				mLobby.RemoveServer(mInternal, mExternal);
-			}
 		}
 	}
 
@@ -75,7 +72,7 @@ public class LobbyServerLink
 
 			if (mExternal != null)
 			{
-				long time = DateTime.Now.Ticks / 10000;
+				long time = DateTime.UtcNow.Ticks / 10000;
 				mNextSend = time + 3000;
 				mLobby.AddServer(mGameServer.name, mGameServer.playerCount, mInternal, mExternal);
 			}
@@ -96,11 +93,19 @@ public class LobbyServerLink
 		mInternal = new IPEndPoint(Tools.localAddress, mGameServer.tcpPort);
 		mExternal = new IPEndPoint(Tools.externalAddress, mGameServer.tcpPort);
 
+		// UDP updates need to be periodic, while the TCP update only needs to happen once
 		if (mLobby is UdpLobbyServer)
 		{
 			while (!mShutdown)
 			{
-				long time = DateTime.Now.Ticks / 10000;
+#if !STANDALONE
+				if (TNManager.isPaused)
+				{
+					Thread.Sleep(500);
+					continue;
+				}
+#endif
+				long time = DateTime.UtcNow.Ticks / 10000;
 
 				if (mNextSend < time && mGameServer != null)
 				{
@@ -110,6 +115,7 @@ public class LobbyServerLink
 				Thread.Sleep(10);
 			}
 		}
+		else mLobby.AddServer(mGameServer.name, mGameServer.playerCount, mInternal, mExternal);
 		mThread = null;
 	}
 }

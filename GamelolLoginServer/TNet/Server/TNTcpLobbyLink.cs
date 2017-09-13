@@ -1,7 +1,7 @@
-//---------------------------------------------
-//            Tasharen Network
-// Copyright © 2012-2014 Tasharen Entertainment
-//---------------------------------------------
+//-------------------------------------------------
+//                    TNet 3
+// Copyright © 2012-2016 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using System;
 using System.IO;
@@ -21,6 +21,9 @@ public class TcpLobbyServerLink : LobbyServerLink
 	IPEndPoint mRemoteAddress;
 	long mNextConnect = 0;
 	bool mWasConnected = false;
+	long mTimeDifference = 0;
+	bool mUpdateNeeded = false;
+	long mNextSend = 0;
 
 	/// <summary>
 	/// Create a new link to a remote lobby server.
@@ -33,6 +36,12 @@ public class TcpLobbyServerLink : LobbyServerLink
 	/// </summary>
 
 	public override bool isActive { get { return mTcp.isConnected; } }
+
+	/// <summary>
+	/// Current time on the server.
+	/// </summary>
+
+	public long serverTime { get { return mTimeDifference + (System.DateTime.UtcNow.Ticks / 10000); } }
 
 	/// <summary>
 	/// Start the lobby server link.
@@ -59,6 +68,7 @@ public class TcpLobbyServerLink : LobbyServerLink
 		if (!mShutdown)
 		{
 			mGameServer = server;
+			mUpdateNeeded = true;
 
 			if (mThread == null)
 			{
@@ -79,20 +89,34 @@ public class TcpLobbyServerLink : LobbyServerLink
 
 		for (; ; )
 		{
-			long time = DateTime.Now.Ticks / 10000;
+			long time = DateTime.UtcNow.Ticks / 10000;
 
 			if (mShutdown)
 			{
 				mTcp.Disconnect();
 				mThread = null;
+#if STANDALONE
+				Tools.Print("TcpLobbyLink shut down");
+#endif
 				break;
 			}
 
+#if !STANDALONE
+			if (TNManager.isPaused)
+			{
+				Thread.Sleep(500);
+				continue;
+			}
+#endif
 			Buffer buffer;
 
 			// Try to establish a connection
-			if (mGameServer != null && !mTcp.isConnected && mNextConnect < time)
+			if (mGameServer != null && !mTcp.isConnected && !mTcp.isTryingToConnect && mNextConnect < time)
 			{
+#if STANDALONE
+				Tools.Print("TcpLobbyLink is connecting to " + mRemoteAddress + "...");
+#endif
+				mUpdateNeeded = true;
 				mNextConnect = time + 15000;
 				mTcp.Connect(mRemoteAddress);
 			}
@@ -106,41 +130,52 @@ public class TcpLobbyServerLink : LobbyServerLink
 				{
 					if (mTcp.VerifyResponseID(response, reader))
 					{
+						mTimeDifference = reader.ReadInt64() - (System.DateTime.UtcNow.Ticks / 10000);
 						mWasConnected = true;
+#if STANDALONE
+						Tools.Print("TcpLobbyLink connection established");
+#endif
 					}
 					else
 					{
 #if STANDALONE
-						Console.WriteLine("TcpLobbyLink: Protocol version mismatch");
+						Tools.Print("TcpLobbyLink Error: Protocol version mismatch");
 #endif
 						mThread = null;
 						return;
 					}
 				}
-				else if (response == Packet.Error)
-				{
-					// Automatically try to re-establish a connection on disconnect
-					mNextConnect = mWasConnected ? 0 : time + 30000;
+				else if (response == Packet.RequestPing) {}
 #if STANDALONE
-					Console.WriteLine("TcpLobbyLink: " + reader.ReadString());
-#endif
-				}
-#if STANDALONE
-				else Console.WriteLine("TcpLobbyLink can't handle this packet: " + response);
+				else if (response == Packet.Error) Tools.Print("TcpLobbyLink Error: " + reader.ReadString());
+				else if (response == Packet.Disconnect) Tools.Print("TcpLobbyLink disconnected");
+				else Tools.Print("TcpLobbyLink can't handle this packet: " + response);
 #endif
 				buffer.Recycle();
 			}
 
-			if (mGameServer != null && mTcp.isConnected)
+
+			// Automatically try to re-establish a connection on disconnect
+			if (mWasConnected && !mTcp.isConnected && !mTcp.isTryingToConnect)
 			{
-				BinaryWriter writer = mTcp.BeginSend(Packet.RequestAddServer);
+				mNextConnect = time + 5000;
+				mWasConnected = false;
+			}
+			else if (mGameServer != null && mTcp.isConnected && (mUpdateNeeded || mNextSend < time))
+			{
+				mUpdateNeeded = false;
+				mNextSend = time + 5000;
+
+				Buffer buff = Buffer.Create();
+				BinaryWriter writer = buff.BeginPacket(Packet.RequestAddServer);
 				writer.Write(GameServer.gameID);
 				writer.Write(mGameServer.name);
 				writer.Write((short)mGameServer.playerCount);
 				Tools.Serialize(writer, mInternal);
 				Tools.Serialize(writer, mExternal);
-				mTcp.EndSend();
-				mGameServer = null;
+				buff.EndPacket();
+				mTcp.SendTcpPacket(buff);
+				buff.Recycle();
 			}
 			Thread.Sleep(10);
 		}
