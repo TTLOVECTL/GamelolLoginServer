@@ -75,6 +75,7 @@ namespace GamelolLoginServer.LoginServer
                         }
                         else
                         {
+                            
                             mLobbyServer = new UdpLobbyServer();
                             mLobbyServer.Start(lobbyPort);
                             if (mUPnP.status != UPnP.Status.Failure) mUPnP.OpenUDP(lobbyPort, OnPortOpened);
