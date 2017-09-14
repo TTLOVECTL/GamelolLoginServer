@@ -16,11 +16,11 @@ namespace GamelolLoginServer
     {
         static void Main(string[] args)
         {
-            new LoginServerBuild();
-            //LoginLogMessage loginLogMessage = new LoginLogMessage();
-            //loginLogMessage.loginPlayerId = 1995;
-            //loginLogMessage.loginIP="192.168.6.114";
-            //LoginLogSystem.Instance.LoginLogWrite(loginLogMessage);
+            //new LoginServerBuild();
+            LoginLogMessage loginLogMessage = new LoginLogMessage();
+            loginLogMessage.loginPlayerId = 1995;
+            loginLogMessage.loginIP="192.168.6.114";
+            LoginLogSystem.Instance.LoginLogWrite(loginLogMessage);
                
         }
     }

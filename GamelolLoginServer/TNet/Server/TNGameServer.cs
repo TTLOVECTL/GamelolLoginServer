@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Net;
 using System.Text;
-
+using GamelolLoginServer.LoginServer;
 #if UNITY_EDITOR
 using UnityEngine;
 #endif
@@ -1214,794 +1214,799 @@ public class GameServer : FileServer
 
 	protected virtual bool Verify (BinaryReader reader) { return true; }
 
-	/// <summary>
-	/// Receive and process a single incoming packet.
-	/// Returns 'true' if a packet was received, 'false' otherwise.
-	/// </summary>
+        /// <summary>
+        /// Receive and process a single incoming packet.
+        /// Returns 'true' if a packet was received, 'false' otherwise.
+        /// </summary>
 
-	bool ProcessPlayerPacket (Buffer buffer, TcpPlayer player, bool reliable)
-	{
-		// Save every 30 seconds
-		if (mNextSave == 0) mNextSave = mTime + 30000;
-		BinaryReader reader = buffer.BeginReading();
+        bool ProcessPlayerPacket(Buffer buffer, TcpPlayer player, bool reliable)
+        {
+            // Save every 30 seconds
+            if (mNextSave == 0) mNextSave = mTime + 30000;
+            BinaryReader reader = buffer.BeginReading();
 
-		// If the player has not yet been verified, the first packet must be an ID request
-		if (player.stage == TcpProtocol.Stage.Verifying)
-		{
-			if (player.VerifyRequestID(reader, buffer, true))
-			{
-				player.isAdmin = (player.address == null ||
-					player.address == "0.0.0.0:0" ||
-					player.address.StartsWith("127.0.0.1:"));
+            // If the player has not yet been verified, the first packet must be an ID request
+            if (player.stage == TcpProtocol.Stage.Verifying)
+            {
+                if (player.VerifyRequestID(reader, buffer, true))
+                {
+                    player.isAdmin = (player.address == null ||
+                        player.address == "0.0.0.0:0" ||
+                        player.address.StartsWith("127.0.0.1:"));
 
-				if (player.isAdmin || !mBan.Contains(player.name))
-				{
-					mPlayerDict.Add(player.id, player);
+                    if (player.isAdmin || !mBan.Contains(player.name))
+                    {
+                        mPlayerDict.Add(player.id, player);
 
-					BinaryWriter writer = player.BeginSend(Packet.ResponseID);
-					writer.Write(TcpPlayer.version);
-					writer.Write(player.id);
-					writer.Write((Int64)(System.DateTime.UtcNow.Ticks / 10000));
-					player.EndSend();
+                        BinaryWriter writer = player.BeginSend(Packet.ResponseID);
+                        writer.Write(TcpPlayer.version);
+                        writer.Write(player.id);
+                        writer.Write((Int64)(System.DateTime.UtcNow.Ticks / 10000));
+                        player.EndSend();
 
-					if (mServerData != null)
-					{
-						writer = player.BeginSend(Packet.ResponseSetServerData);
-						writer.Write("");
-						writer.WriteObject(mServerData);
-						player.EndSend();
-					}
+                        if (mServerData != null)
+                        {
+                            writer = player.BeginSend(Packet.ResponseSetServerData);
+                            writer.Write("");
+                            writer.WriteObject(mServerData);
+                            player.EndSend();
+                        }
 
-					if (player.isAdmin)
-					{
-						player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
-						player.EndSend();
-					}
+                        if (player.isAdmin)
+                        {
+                            player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
+                            player.EndSend();
+                        }
 
-					if (lobbyLink != null) lobbyLink.SendUpdate(this);
-					if (onPlayerConnect != null) onPlayerConnect(player);
-					return true;
-				}
-				else
-				{
-					player.Log("User is banned");
-					RemovePlayer(player);
-					return false;
-				}
-			}
+                        if (lobbyLink != null) lobbyLink.SendUpdate(this);
+                        if (onPlayerConnect != null) onPlayerConnect(player);
+                        return true;
+                    }
+                    else
+                    {
+                        player.Log("User is banned");
+                        RemovePlayer(player);
+                        return false;
+                    }
+                }
 
-			BeginSend(Packet.ResponseID).Write(0);
-			EndSend(true, player);
+                BeginSend(Packet.ResponseID).Write(0);
+                EndSend(true, player);
 
-			Tools.Print(player.address + " has failed the verification step");
-			RemovePlayer(player);
-			return false;
-		}
+                Tools.Print(player.address + " has failed the verification step");
+                RemovePlayer(player);
+                return false;
+            }
 
-		Packet request = (Packet)reader.ReadByte();
+            Packet request = (Packet)reader.ReadByte();
 
 #if DEBUG_PACKETS && !STANDALONE
- #if !SINGLE_THREADED
+#if !SINGLE_THREADED
         if (request != Packet.RequestPing && request != Packet.ResponsePing)
             Tools.Print("Server: " + request + " (" + buffer.size.ToString("N0") + " bytes)");
- #elif UNITY_EDITOR
+#elif UNITY_EDITOR
 		if (request != Packet.RequestPing && request != Packet.ResponsePing)
 			UnityEngine.Debug.Log("Server: " + request + " (" + buffer.size.ToString("N0") + " bytes)");
- #endif
 #endif
-		switch (request)
-		{
-			case Packet.Empty:
-			{
-				break;
-			}
-			case Packet.Error:
-			{
-				player.LogError(reader.ReadString());
-				break;
-			}
-			case Packet.Disconnect:
-			{
-				RemovePlayer(player);
-				break;
-			}
-			case Packet.RequestPing:
-			{
-				// Respond with a ping back
-				player.BeginSend(Packet.ResponsePing);
-				player.EndSend();
-				break;
-			}
-			case Packet.RequestSetUDP:
-			{
-				int port = reader.ReadUInt16();
+#endif
+            switch (request)
+            {
+                case Packet.Empty:
+                    {
+                        break;
+                    }
+                case Packet.Error:
+                    {
+                        player.LogError(reader.ReadString());
+                        break;
+                    }
+                case Packet.Disconnect:
+                    {
+                        RemovePlayer(player);
+                        break;
+                    }
+                case Packet.RequestPing:
+                    {
+                        // Respond with a ping back
+                        player.BeginSend(Packet.ResponsePing);
+                        player.EndSend();
+                        break;
+                    }
+                case Packet.RequestSetUDP:
+                    {
+                        int port = reader.ReadUInt16();
 
-				if (port != 0 && mUdp.isActive && player.tcpEndPoint != null)
-				{
-					IPAddress ip = new IPAddress(player.tcpEndPoint.Address.GetAddressBytes());
-					SetPlayerUdpEndPoint(player, new IPEndPoint(ip, port));
-				}
-				else SetPlayerUdpEndPoint(player, null);
+                        if (port != 0 && mUdp.isActive && player.tcpEndPoint != null)
+                        {
+                            IPAddress ip = new IPAddress(player.tcpEndPoint.Address.GetAddressBytes());
+                            SetPlayerUdpEndPoint(player, new IPEndPoint(ip, port));
+                        }
+                        else SetPlayerUdpEndPoint(player, null);
 
-				// Let the player know if we are hosting an active UDP connection
-				ushort udp = mUdp.isActive ? (ushort)mUdp.listeningPort : (ushort)0;
-				player.BeginSend(Packet.ResponseSetUDP).Write(udp);
-				player.EndSend();
+                        // Let the player know if we are hosting an active UDP connection
+                        ushort udp = mUdp.isActive ? (ushort)mUdp.listeningPort : (ushort)0;
+                        player.BeginSend(Packet.ResponseSetUDP).Write(udp);
+                        player.EndSend();
 
-				// Send an empty packet to the target player to open up UDP for communication
-				if (player.udpEndPoint != null) mUdp.SendEmptyPacket(player.udpEndPoint);
-				break;
-			}
-			case Packet.RequestActivateUDP:
-			{
-				player.udpIsUsable = true;
-				if (player.udpEndPoint != null) mUdp.SendEmptyPacket(player.udpEndPoint);
-				break;
-			}
-			case Packet.RequestJoinChannel:
-			{
-				// Join the specified channel
-				int		channelID	= reader.ReadInt32();
-				string	pass		= reader.ReadString();
-				string	levelName	= reader.ReadString();
-				bool	persist		= reader.ReadBoolean();
-				ushort	playerLimit = reader.ReadUInt16();
+                        // Send an empty packet to the target player to open up UDP for communication
+                        if (player.udpEndPoint != null) mUdp.SendEmptyPacket(player.udpEndPoint);
+                        break;
+                    }
+                case Packet.RequestActivateUDP:
+                    {
+                        player.udpIsUsable = true;
+                        if (player.udpEndPoint != null) mUdp.SendEmptyPacket(player.udpEndPoint);
+                        break;
+                    }
+                case Packet.RequestJoinChannel:
+                    {
+                        // Join the specified channel
+                        int channelID = reader.ReadInt32();
+                        string pass = reader.ReadString();
+                        string levelName = reader.ReadString();
+                        bool persist = reader.ReadBoolean();
+                        ushort playerLimit = reader.ReadUInt16();
 
-				if (mServerData != null)
-				{
-					int min = mServerData.GetChild<int>("minAlias", 0);
-					int aliasCount = (player.aliases == null ? 0 : player.aliases.size);
+                        if (mServerData != null)
+                        {
+                            int min = mServerData.GetChild<int>("minAlias", 0);
+                            int aliasCount = (player.aliases == null ? 0 : player.aliases.size);
 
-					if (aliasCount < min)
-					{
-						player.Log("Player has " + aliasCount + " aliases, expected at least " + min);
-						RemovePlayer(player);
-						return false;
-					}
-				}
+                            if (aliasCount < min)
+                            {
+                                player.Log("Player has " + aliasCount + " aliases, expected at least " + min);
+                                RemovePlayer(player);
+                                return false;
+                            }
+                        }
 
-				SendJoinChannel(player, channelID, pass, levelName, persist, playerLimit);
-				break;
-			}
-			case Packet.RequestSetName:
-			{
-				// Change the player's name
-				player.name = reader.ReadString();
+                        SendJoinChannel(player, channelID, pass, levelName, persist, playerLimit);
+                        break;
+                    }
+                case Packet.RequestSetName:
+                    {
+                        // Change the player's name
+                        player.name = reader.ReadString();
 
-				if (mBan.Contains(player.name))
-				{
-					player.Log("FAILED a ban check: " + player.name);
-					RemovePlayer(player);
-					break;
-				}
+                        if (mBan.Contains(player.name))
+                        {
+                            player.Log("FAILED a ban check: " + player.name);
+                            RemovePlayer(player);
+                            break;
+                        }
 
-				BinaryWriter writer = BeginSend(Packet.ResponseRenamePlayer);
-				writer.Write(player.id);
-				writer.Write(player.name);
-				EndSendToOthers(player, null, true);
-				break;
-			}
-			case Packet.RequestSetPlayerData:
-			{
-				// 4 bytes for the size, 1 byte for the ID
-				int origin = buffer.position - 5;
+                        BinaryWriter writer = BeginSend(Packet.ResponseRenamePlayer);
+                        writer.Write(player.id);
+                        writer.Write(player.name);
+                        EndSendToOthers(player, null, true);
+                        break;
+                    }
+                case Packet.RequestSetPlayerData:
+                    {
+                        // 4 bytes for the size, 1 byte for the ID
+                        int origin = buffer.position - 5;
 
-				// Set the local data
-				int playerID = reader.ReadInt32();
-				string str = reader.ReadString();
-				object obj = reader.ReadObject();
+                        // Set the local data
+                        int playerID = reader.ReadInt32();
+                        string str = reader.ReadString();
+                        object obj = reader.ReadObject();
 
-				if (player.id == playerID)
-				{
-					player.Set(str, obj);
-					player.saveNeeded = true;
+                        if (player.id == playerID)
+                        {
+                            player.Set(str, obj);
+                            player.saveNeeded = true;
 
-					// Change the packet type to a response before sending it as-is
-					buffer.buffer[origin + 4] = (byte)Packet.ResponseSetPlayerData;
-					buffer.position = origin;
+                            // Change the packet type to a response before sending it as-is
+                            buffer.buffer[origin + 4] = (byte)Packet.ResponseSetPlayerData;
+                            buffer.position = origin;
 
-					// Forward the packet to everyone that knows this player
-					for (int i = 0; i < mPlayerList.size; ++i)
-					{
-						TcpPlayer tp = mPlayerList[i];
-						if (tp != player && tp.IsKnownTo(player)) tp.SendTcpPacket(buffer);
-					}
-				}
-				else player.LogError("Players should only set their own data. Ignoring.", null, false);
-				break;
-			}
-			case Packet.RequestSetPlayerSave:
-			{
-				// Delete the previous save
-				if (!string.IsNullOrEmpty(player.savePath))
-					Tools.DeleteFile(player.savePath);
+                            // Forward the packet to everyone that knows this player
+                            for (int i = 0; i < mPlayerList.size; ++i)
+                            {
+                                TcpPlayer tp = mPlayerList[i];
+                                if (tp != player && tp.IsKnownTo(player)) tp.SendTcpPacket(buffer);
+                            }
+                        }
+                        else player.LogError("Players should only set their own data. Ignoring.", null, false);
+                        break;
+                    }
+                case Packet.RequestSetPlayerSave:
+                    {
+                        // Delete the previous save
+                        if (!string.IsNullOrEmpty(player.savePath))
+                            Tools.DeleteFile(player.savePath);
 
-				// Load and set the player's data from the specified file
-				player.savePath = reader.ReadString();
-				player.saveType = (DataNode.SaveType)reader.ReadByte();
-				player.dataNode = DataNode.Read(player.savePath);
-				player.saveNeeded = false;
+                        // Load and set the player's data from the specified file
+                        player.savePath = reader.ReadString();
+                        player.saveType = (DataNode.SaveType)reader.ReadByte();
+                        player.dataNode = DataNode.Read(player.savePath);
+                        player.saveNeeded = false;
 
-				Buffer buff = Buffer.Create();
-				BinaryWriter writer = buff.BeginPacket(Packet.ResponseSetPlayerData);
-				writer.Write(player.id);
-				writer.Write("");
-				writer.WriteObject(player.dataNode);
-				buff.EndPacket();
+                        Buffer buff = Buffer.Create();
+                        BinaryWriter writer = buff.BeginPacket(Packet.ResponseSetPlayerData);
+                        writer.Write(player.id);
+                        writer.Write("");
+                        writer.WriteObject(player.dataNode);
+                        buff.EndPacket();
 
-				player.SendTcpPacket(buff);
-				SendToOthers(buff, player, player, true);
-				buff.Recycle();
-				break;
-			}
-			case Packet.RequestSaveFile:
-			{
-				try
-				{
-					string fileName = reader.ReadString();
-					byte[] data = reader.ReadBytes(reader.ReadInt32());
-					
-					if (!string.IsNullOrEmpty(fileName))
-					{
-						if (data == null || data.Length == 0)
-						{
-							if (DeleteFile(fileName))
-								player.Log("Deleted " + fileName);
-						}
-						else if (SaveFile(fileName, data))
-						{
-							player.Log("Saved " + fileName + " (" + (data != null ? data.Length.ToString("N0") : "0") + " bytes)");
-						}
-						else player.LogError("Unable to save " + fileName);
-					}
-				}
-				catch (Exception ex)
-				{
-					player.LogError(ex.Message, ex.StackTrace);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestLoadFile:
-			{
-				string fn = reader.ReadString();
-				byte[] data = LoadFile(fn);
+                        player.SendTcpPacket(buff);
+                        SendToOthers(buff, player, player, true);
+                        buff.Recycle();
+                        break;
+                    }
+                case Packet.RequestSaveFile:
+                    {
+                        try
+                        {
+                            string fileName = reader.ReadString();
+                            byte[] data = reader.ReadBytes(reader.ReadInt32());
 
-				BinaryWriter writer = BeginSend(Packet.ResponseLoadFile);
-				writer.Write(fn);
+                            if (!string.IsNullOrEmpty(fileName))
+                            {
+                                if (data == null || data.Length == 0)
+                                {
+                                    if (DeleteFile(fileName))
+                                        player.Log("Deleted " + fileName);
+                                }
+                                else if (SaveFile(fileName, data))
+                                {
+                                    player.Log("Saved " + fileName + " (" + (data != null ? data.Length.ToString("N0") : "0") + " bytes)");
+                                }
+                                else player.LogError("Unable to save " + fileName);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            player.LogError(ex.Message, ex.StackTrace);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestLoadFile:
+                    {
+                        string fn = reader.ReadString();
+                        byte[] data = LoadFile(fn);
 
-				if (data != null)
-				{
-					writer.Write(data.Length);
-					writer.Write(data);
-				}
-				else writer.Write(0);
+                        BinaryWriter writer = BeginSend(Packet.ResponseLoadFile);
+                        writer.Write(fn);
 
-				EndSend(true, player);
-				break;
-			}
-			case Packet.RequestDeleteFile:
-			{
-				string fileName = reader.ReadString();
+                        if (data != null)
+                        {
+                            writer.Write(data.Length);
+                            writer.Write(data);
+                        }
+                        else writer.Write(0);
 
-				if (!string.IsNullOrEmpty(fileName))
-				{
-					if (DeleteFile(fileName))
-						player.Log("Deleted " + fileName);
-				}
-				break;
-			}
-			case Packet.RequestNoDelay:
-			{
-				player.noDelay = reader.ReadBoolean();
-				break;
-			}
-			case Packet.RequestChannelList:
-			{
-				BinaryWriter writer = BeginSend(Packet.ResponseChannelList);
+                        EndSend(true, player);
+                        break;
+                    }
+                case Packet.RequestDeleteFile:
+                    {
+                        string fileName = reader.ReadString();
 
-				int count = 0;
-				for (int i = 0; i < mChannelList.size; ++i)
-					if (!mChannelList[i].closed) ++count;
+                        if (!string.IsNullOrEmpty(fileName))
+                        {
+                            if (DeleteFile(fileName))
+                                player.Log("Deleted " + fileName);
+                        }
+                        break;
+                    }
+                case Packet.RequestNoDelay:
+                    {
+                        player.noDelay = reader.ReadBoolean();
+                        break;
+                    }
+                case Packet.RequestChannelList:
+                    {
+                        BinaryWriter writer = BeginSend(Packet.ResponseChannelList);
 
-				writer.Write(count);
+                        int count = 0;
+                        for (int i = 0; i < mChannelList.size; ++i)
+                            if (!mChannelList[i].closed) ++count;
 
-				for (int i = 0; i < mChannelList.size; ++i)
-				{
-					Channel ch = mChannelList[i];
+                        writer.Write(count);
 
-					if (!ch.closed)
-					{
-						writer.Write(ch.id);
-						writer.Write((ushort)ch.players.size);
-						writer.Write(ch.playerLimit);
-						writer.Write(!string.IsNullOrEmpty(ch.password));
-						writer.Write(ch.persistent);
-						writer.Write(ch.level);
-						writer.Write(ch.dataNode);
-					}
-				}
-				EndSend(true, player);
-				break;
-			}
-			case Packet.ServerLog:
-			{
+                        for (int i = 0; i < mChannelList.size; ++i)
+                        {
+                            Channel ch = mChannelList[i];
+
+                            if (!ch.closed)
+                            {
+                                writer.Write(ch.id);
+                                writer.Write((ushort)ch.players.size);
+                                writer.Write(ch.playerLimit);
+                                writer.Write(!string.IsNullOrEmpty(ch.password));
+                                writer.Write(ch.persistent);
+                                writer.Write(ch.level);
+                                writer.Write(ch.dataNode);
+                            }
+                        }
+                        EndSend(true, player);
+                        break;
+                    }
+                case Packet.ServerLog:
+                    {
 #if UNITY_EDITOR
 				reader.ReadString();
 #else
-				string s = reader.ReadString();
-				player.Log(s);
+                        string s = reader.ReadString();
+                        player.Log(s);
 #endif
-				break;
-			}
-			case Packet.RequestSetTimeout:
-			{
-				// The passed value is in seconds, but the stored value is in milliseconds (to avoid a math operation)
-				player.timeoutTime = reader.ReadInt32() * 1000;
-				break;
-			}
-			case Packet.ForwardToPlayer:
-			{
-				// Forward this packet to the specified player
-				int start = buffer.position - 5;
+                        break;
+                    }
+                case Packet.RequestSetTimeout:
+                    {
+                        // The passed value is in seconds, but the stored value is in milliseconds (to avoid a math operation)
+                        player.timeoutTime = reader.ReadInt32() * 1000;
+                        break;
+                    }
+                case Packet.ForwardToPlayer:
+                    {
+                        // Forward this packet to the specified player
+                        int start = buffer.position - 5;
 
-				if (reader.ReadInt32() == player.id) // Validate the packet's source
-				{
-					TcpPlayer target = GetPlayer(reader.ReadInt32());
+                        if (reader.ReadInt32() == player.id) // Validate the packet's source
+                        {
+                            TcpPlayer target = GetPlayer(reader.ReadInt32());
 
-					if (target != null && target.isConnected)
-					{
-						buffer.position = start;
-						target.SendTcpPacket(buffer);
-					}
-				}
-				break;
-			}
-			case Packet.ForwardByName:
-			{
-				int start = buffer.position - 5;
+                            if (target != null && target.isConnected)
+                            {
+                                buffer.position = start;
+                                target.SendTcpPacket(buffer);
+                            }
+                        }
+                        break;
+                    }
+                case Packet.ForwardByName:
+                    {
+                        int start = buffer.position - 5;
 
-				if (reader.ReadInt32() == player.id) // Validate the packet's source
-				{
-					string name = reader.ReadString();
-					TcpPlayer target = GetPlayer(name);
+                        if (reader.ReadInt32() == player.id) // Validate the packet's source
+                        {
+                            string name = reader.ReadString();
+                            TcpPlayer target = GetPlayer(name);
 
-					if (target != null && target.isConnected)
-					{
-						buffer.position = start;
-						target.SendTcpPacket(buffer);
-					}
-					else if (reliable)
-					{
-						BeginSend(Packet.ForwardTargetNotFound).Write(name);
-						EndSend(true, player);
-					}
-				}
-				break;
-			}
-			case Packet.BroadcastAdmin:
-			case Packet.Broadcast:
-			{
-				// 4 bytes for the size, 1 byte for the ID
-				int origin = buffer.position - 5;
+                            if (target != null && target.isConnected)
+                            {
+                                buffer.position = start;
+                                target.SendTcpPacket(buffer);
+                            }
+                            else if (reliable)
+                            {
+                                BeginSend(Packet.ForwardTargetNotFound).Write(name);
+                                EndSend(true, player);
+                            }
+                        }
+                        break;
+                    }
+                case Packet.BroadcastAdmin:
+                case Packet.Broadcast:
+                    {
+                        // 4 bytes for the size, 1 byte for the ID
+                        int origin = buffer.position - 5;
 
-				//Tools.Print("Broadcast: " + player.name + ", " + player.address);
+                        //Tools.Print("Broadcast: " + player.name + ", " + player.address);
 
-				if (!player.isAdmin)
-				{
-					if (player.nextBroadcast < mTime)
-					{
-						player.nextBroadcast = mTime + 500;
-						player.broadcastCount = 0;
-					}
-					else if (++player.broadcastCount > 5)
-					{
-						player.Log("SPAM filter trigger!");
-						RemovePlayer(player);
-						break;
-					}
-					else if (player.broadcastCount > 2)
-					{
-						player.Log("Possible spam!");
-					}
-				}
+                        if (!player.isAdmin)
+                        {
+                            if (player.nextBroadcast < mTime)
+                            {
+                                player.nextBroadcast = mTime + 500;
+                                player.broadcastCount = 0;
+                            }
+                            else if (++player.broadcastCount > 5)
+                            {
+                                player.Log("SPAM filter trigger!");
+                                RemovePlayer(player);
+                                break;
+                            }
+                            else if (player.broadcastCount > 2)
+                            {
+                                player.Log("Possible spam!");
+                            }
+                        }
 
-				int playerID = reader.ReadInt32();
+                        int playerID = reader.ReadInt32();
 
-				// Exploit: echoed packet of another player
-				if (playerID != player.id)
-				{
-					player.LogError("Tried to echo a broadcast packet (" + playerID + " vs " + player.id + ")", null);
-					RemovePlayer(player);
-					break;
-				}
+                        // Exploit: echoed packet of another player
+                        if (playerID != player.id)
+                        {
+                            player.LogError("Tried to echo a broadcast packet (" + playerID + " vs " + player.id + ")", null);
+                            RemovePlayer(player);
+                            break;
+                        }
 
-				buffer.position = origin;
+                        buffer.position = origin;
 
-				// Forward the packet to everyone connected to the server
-				for (int i = 0; i < mPlayerList.size; ++i)
-				{
-					TcpPlayer tp = mPlayerList[i];
-					if (!tp.isConnected) continue;
-					if (request == Packet.BroadcastAdmin && !tp.isAdmin) continue;
+                        // Forward the packet to everyone connected to the server
+                        for (int i = 0; i < mPlayerList.size; ++i)
+                        {
+                            TcpPlayer tp = mPlayerList[i];
+                            if (!tp.isConnected) continue;
+                            if (request == Packet.BroadcastAdmin && !tp.isAdmin) continue;
 
-					if (reliable || !tp.udpIsUsable || tp.udpEndPoint == null || !mAllowUdp)
-					{
-						tp.SendTcpPacket(buffer);
-					}
-					else mUdp.Send(buffer, tp.udpEndPoint);
-				}
-				break;
-			}
-			case Packet.RequestVerifyAdmin:
-			{
-				string pass = reader.ReadString();
+                            if (reliable || !tp.udpIsUsable || tp.udpEndPoint == null || !mAllowUdp)
+                            {
+                                tp.SendTcpPacket(buffer);
+                            }
+                            else mUdp.Send(buffer, tp.udpEndPoint);
+                        }
+                        break;
+                    }
+                case Packet.RequestVerifyAdmin:
+                    {
+                        string pass = reader.ReadString();
 
-				if (!string.IsNullOrEmpty(pass) && mAdmin.Contains(pass))
-				{
-					if (!player.isAdmin)
-					{
-						player.isAdmin = true;
-						player.Log("Admin verified");
-						player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
-						player.EndSend();
-					}
-				}
-				else
-				{
-					player.LogError("Tried to authenticate as admin and failed (" + pass + ")");
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestCreateAdmin:
-			{
-				string s = reader.ReadString();
+                        if (!string.IsNullOrEmpty(pass) && mAdmin.Contains(pass))
+                        {
+                            if (!player.isAdmin)
+                            {
+                                player.isAdmin = true;
+                                player.Log("Admin verified");
+                                player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
+                                player.EndSend();
+                            }
+                        }
+                        else
+                        {
+                            player.LogError("Tried to authenticate as admin and failed (" + pass + ")");
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestCreateAdmin:
+                    {
+                        string s = reader.ReadString();
 
-				if (player.isAdmin)
-				{
-					if (!mAdmin.Contains(s)) mAdmin.Add(s);
-					player.Log("Added an admin (" + s + ")");
-					Tools.SaveList("ServerConfig/admin.txt", mAdmin);
-				}
-				else
-				{
-					player.LogError("Tried to add an admin (" + s + ") and failed");
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestRemoveAdmin:
-			{
-				string s = reader.ReadString();
+                        if (player.isAdmin)
+                        {
+                            if (!mAdmin.Contains(s)) mAdmin.Add(s);
+                            player.Log("Added an admin (" + s + ")");
+                            Tools.SaveList("ServerConfig/admin.txt", mAdmin);
+                        }
+                        else
+                        {
+                            player.LogError("Tried to add an admin (" + s + ") and failed");
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestRemoveAdmin:
+                    {
+                        string s = reader.ReadString();
 
-				// First administrator can't be removed
-				if (player.isAdmin && (mAdmin.size == 0 || mAdmin[0] != s))
-				{
-					mAdmin.Remove(s);
-					player.Log("Removed an admin (" + s + ")");
-					Tools.SaveList("ServerConfig/admin.txt", mAdmin);
-				}
-				else
-				{
-					player.LogError("Tried to remove an admin (" + s + ") without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestSetAlias:
-			{
-				string s = reader.ReadString();
-				if (!SetAlias(player, s)) break;
+                        // First administrator can't be removed
+                        if (player.isAdmin && (mAdmin.size == 0 || mAdmin[0] != s))
+                        {
+                            mAdmin.Remove(s);
+                            player.Log("Removed an admin (" + s + ")");
+                            Tools.SaveList("ServerConfig/admin.txt", mAdmin);
+                        }
+                        else
+                        {
+                            player.LogError("Tried to remove an admin (" + s + ") without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestSetAlias:
+                    {
+                        string s = reader.ReadString();
+                        if (!SetAlias(player, s)) break;
 
-				if (mAdmin.Contains(s))
-				{
-					player.isAdmin = true;
-					player.Log("Admin verified");
-					player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
-					player.EndSend();
-				}
+                        if (mAdmin.Contains(s))
+                        {
+                            player.isAdmin = true;
+                            player.Log("Admin verified");
+                            player.BeginSend(Packet.ResponseVerifyAdmin).Write(player.id);
+                            player.EndSend();
+                        }
 
-				if (mServerData != null)
-				{
-					int max = mServerData.GetChild<int>("maxAlias", int.MaxValue);
-					int aliasCount = (player.aliases == null ? 0 : player.aliases.size);
+                        if (mServerData != null)
+                        {
+                            int max = mServerData.GetChild<int>("maxAlias", int.MaxValue);
+                            int aliasCount = (player.aliases == null ? 0 : player.aliases.size);
 
-					if (aliasCount > max)
-					{
-						player.Log("Player has " + aliasCount + "/" + max + " aliases");
-						RemovePlayer(player);
-						return false;
-					}
-				}
-				break;
-			}
-			case Packet.RequestUnban:
-			{
-				string s = reader.ReadString();
+                            if (aliasCount > max)
+                            {
+                                player.Log("Player has " + aliasCount + "/" + max + " aliases");
+                                RemovePlayer(player);
+                                return false;
+                            }
+                        }
+                        break;
+                    }
+                case Packet.RequestUnban:
+                    {
+                        string s = reader.ReadString();
 
-				if (player.isAdmin)
-				{
-					mBan.Remove(s);
-					Tools.SaveList("ServerConfig/ban.txt", mBan);
-					player.Log("Removed an banned keyword (" + s + ")");
-				}
-				else
-				{
-					player.LogError("Tried to unban (" + s + ") without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestSetBanList:
-			{
-				string s = reader.ReadString();
+                        if (player.isAdmin)
+                        {
+                            mBan.Remove(s);
+                            Tools.SaveList("ServerConfig/ban.txt", mBan);
+                            player.Log("Removed an banned keyword (" + s + ")");
+                        }
+                        else
+                        {
+                            player.LogError("Tried to unban (" + s + ") without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestSetBanList:
+                    {
+                        string s = reader.ReadString();
 
-				if (player.isAdmin)
-				{
-					if (!string.IsNullOrEmpty(s))
-					{
-						string[] lines = s.Split('\n');
-						mBan.Clear();
-						for (int i = 0; i < lines.Length; ++i) mBan.Add(lines[i]);
-					}
-					else mBan.Clear();
-				}
-				else
-				{
-					player.LogError("Tried to set the ban list without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestReloadServerConfig:
-			{
-				if (player.isAdmin)
-				{
-					Tools.LoadList("ServerConfig/ban.txt", mBan);
-					Tools.LoadList("ServerConfig/admin.txt", mAdmin);
-					LoadConfig();
+                        if (player.isAdmin)
+                        {
+                            if (!string.IsNullOrEmpty(s))
+                            {
+                                string[] lines = s.Split('\n');
+                                mBan.Clear();
+                                for (int i = 0; i < lines.Length; ++i) mBan.Add(lines[i]);
+                            }
+                            else mBan.Clear();
+                        }
+                        else
+                        {
+                            player.LogError("Tried to set the ban list without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestReloadServerConfig:
+                    {
+                        if (player.isAdmin)
+                        {
+                            Tools.LoadList("ServerConfig/ban.txt", mBan);
+                            Tools.LoadList("ServerConfig/admin.txt", mAdmin);
+                            LoadConfig();
 
-					if (mServerData == null) mServerData = new DataNode("Version", Player.version);
+                            if (mServerData == null) mServerData = new DataNode("Version", Player.version);
 
-					Buffer buff = Buffer.Create();
-					var writer = buff.BeginPacket(Packet.ResponseSetServerData);
-					writer.Write("");
-					writer.WriteObject(mServerData);
-					buff.EndPacket();
+                            Buffer buff = Buffer.Create();
+                            var writer = buff.BeginPacket(Packet.ResponseSetServerData);
+                            writer.Write("");
+                            writer.WriteObject(mServerData);
+                            buff.EndPacket();
 
-					// Forward the packet to everyone connected to the server
-					for (int i = 0; i < mPlayerList.size; ++i)
-					{
-						TcpPlayer tp = mPlayerList[i];
-						tp.SendTcpPacket(buff);
-					}
-					buff.Recycle();
-				}
-				else
-				{
-					player.LogError("Tried to request reloaded server data without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestSetServerData:
-			{
-				if (player.isAdmin)
-				{
-					if (mServerData == null) mServerData = new DataNode("Version", Player.version);
+                            // Forward the packet to everyone connected to the server
+                            for (int i = 0; i < mPlayerList.size; ++i)
+                            {
+                                TcpPlayer tp = mPlayerList[i];
+                                tp.SendTcpPacket(buff);
+                            }
+                            buff.Recycle();
+                        }
+                        else
+                        {
+                            player.LogError("Tried to request reloaded server data without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestSetServerData:
+                    {
+                        if (player.isAdmin)
+                        {
+                            if (mServerData == null) mServerData = new DataNode("Version", Player.version);
 
-					// 4 bytes for size, 1 byte for ID
-					int origin = buffer.position - 5;
+                            // 4 bytes for size, 1 byte for ID
+                            int origin = buffer.position - 5;
 
-					// Change the local configuration
-					mServerData.SetHierarchy(reader.ReadString(), reader.ReadObject());
-					mServerDataChanged = true;
+                            // Change the local configuration
+                            mServerData.SetHierarchy(reader.ReadString(), reader.ReadObject());
+                            mServerDataChanged = true;
 
-					// Change the packet type to a response before sending it as-is
-					buffer.buffer[origin + 4] = (byte)Packet.ResponseSetServerData;
-					buffer.position = origin;
+                            // Change the packet type to a response before sending it as-is
+                            buffer.buffer[origin + 4] = (byte)Packet.ResponseSetServerData;
+                            buffer.position = origin;
 
-					// Forward the packet to everyone connected to the server
-					for (int i = 0; i < mPlayerList.size; ++i)
-					{
-						TcpPlayer tp = mPlayerList[i];
-						tp.SendTcpPacket(buffer);
-					}
-				}
-				else
-				{
-					player.LogError("Tried to set the server data without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestKick:
-			{
-				int channelID = reader.ReadInt32();
-				int id = reader.ReadInt32();
-				string s = (id != 0) ? null : reader.ReadString();
-				TcpPlayer other = (id != 0) ? GetPlayer(id) : GetPlayer(s);
+                            // Forward the packet to everyone connected to the server
+                            for (int i = 0; i < mPlayerList.size; ++i)
+                            {
+                                TcpPlayer tp = mPlayerList[i];
+                                tp.SendTcpPacket(buffer);
+                            }
+                        }
+                        else
+                        {
+                            player.LogError("Tried to set the server data without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestKick:
+                    {
+                        int channelID = reader.ReadInt32();
+                        int id = reader.ReadInt32();
+                        string s = (id != 0) ? null : reader.ReadString();
+                        TcpPlayer other = (id != 0) ? GetPlayer(id) : GetPlayer(s);
 
-				if (player.isAdmin)
-				{
-					player.Log(player.name + " kicked " + other.name + " (" + other.address + ")");
-					LeaveAllChannels(other);
-				}
-				else
-				{
-					Channel ch;
+                        if (player.isAdmin)
+                        {
+                            player.Log(player.name + " kicked " + other.name + " (" + other.address + ")");
+                            LeaveAllChannels(other);
+                        }
+                        else
+                        {
+                            Channel ch;
 
-					if (mChannelDict.TryGetValue(channelID, out ch) && ch != null && ch.host == player)
-					{
-						player.Log(player.name + " kicked " + other.name + " (" + other.address + ") from channel " + channelID);
-						SendLeaveChannel(other, ch, true);
-					}
-				}
-				break;
-			}
-			case Packet.RequestBan:
-			{
-				int id = reader.ReadInt32();
-				string s = (id != 0) ? null : reader.ReadString();
-				TcpPlayer other = (id != 0) ? GetPlayer(id) : GetPlayer(s);
+                            if (mChannelDict.TryGetValue(channelID, out ch) && ch != null && ch.host == player)
+                            {
+                                player.Log(player.name + " kicked " + other.name + " (" + other.address + ") from channel " + channelID);
+                                SendLeaveChannel(other, ch, true);
+                            }
+                        }
+                        break;
+                    }
+                case Packet.RequestBan:
+                    {
+                        int id = reader.ReadInt32();
+                        string s = (id != 0) ? null : reader.ReadString();
+                        TcpPlayer other = (id != 0) ? GetPlayer(id) : GetPlayer(s);
 
-				bool playerBan = (other == player && mServerData != null && mServerData.GetChild<bool>("playersCanBan"));
+                        bool playerBan = (other == player && mServerData != null && mServerData.GetChild<bool>("playersCanBan"));
 
-				if (player.isAdmin || playerBan)
-				{
-					if (other != null)
-					{
-						Ban(player, other);
-					}
-					else if (id == 0)
-					{
-						player.Log("BANNED " + s);
-						string banText = "// [" + s + "] banned by [" + player.name + "]- " + (player.aliases != null &&
-							player.aliases.size > 0 ? player.aliases[0] : player.address);
-						AddUnique(mBan, banText);
-						AddUnique(mBan, s);
-						Tools.SaveList("ServerConfig/ban.txt", mBan);
-					}
-				}
-				else if (!playerBan)
-				{
-					// Do nothing -- players can't ban other players, even themselves for security reasons
-				}
-				else
-				{
-					player.LogError("Tried to ban " + (other != null ? other.name : s) + " without authorization", null);
-					RemovePlayer(player);
-				}
-				break;
-			}
-			case Packet.RequestGetFileList:
-			{
-				string original = reader.ReadString();
-				string path = Tools.FindDirectory(original, player.isAdmin);
+                        if (player.isAdmin || playerBan)
+                        {
+                            if (other != null)
+                            {
+                                Ban(player, other);
+                            }
+                            else if (id == 0)
+                            {
+                                player.Log("BANNED " + s);
+                                string banText = "// [" + s + "] banned by [" + player.name + "]- " + (player.aliases != null &&
+                                    player.aliases.size > 0 ? player.aliases[0] : player.address);
+                                AddUnique(mBan, banText);
+                                AddUnique(mBan, s);
+                                Tools.SaveList("ServerConfig/ban.txt", mBan);
+                            }
+                        }
+                        else if (!playerBan)
+                        {
+                            // Do nothing -- players can't ban other players, even themselves for security reasons
+                        }
+                        else
+                        {
+                            player.LogError("Tried to ban " + (other != null ? other.name : s) + " without authorization", null);
+                            RemovePlayer(player);
+                        }
+                        break;
+                    }
+                case Packet.RequestGetFileList:
+                    {
+                        string original = reader.ReadString();
+                        string path = Tools.FindDirectory(original, player.isAdmin);
 
-				BinaryWriter writer = player.BeginSend(Packet.ResponseGetFileList);
-				writer.Write(original);
+                        BinaryWriter writer = player.BeginSend(Packet.ResponseGetFileList);
+                        writer.Write(original);
 
-				if (!string.IsNullOrEmpty(path))
-				{
-					string[] files = Tools.GetFiles(path);
-					writer.Write(files.Length);
-					for (int i = 0, imax = files.Length; i < imax; ++i)
-						writer.Write(files[i]);
-				}
-				else writer.Write(0);
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            string[] files = Tools.GetFiles(path);
+                            writer.Write(files.Length);
+                            for (int i = 0, imax = files.Length; i < imax; ++i)
+                                writer.Write(files[i]);
+                        }
+                        else writer.Write(0);
 
-				player.EndSend();
-				break;
-			}
-			case Packet.RequestLockChannel:
-			{
-				int channelID = reader.ReadInt32();
-				Channel ch = null;
-				mChannelDict.TryGetValue(channelID, out ch);
-				bool locked = reader.ReadBoolean();
+                        player.EndSend();
+                        break;
+                    }
+                case Packet.RequestLockChannel:
+                    {
+                        int channelID = reader.ReadInt32();
+                        Channel ch = null;
+                        mChannelDict.TryGetValue(channelID, out ch);
+                        bool locked = reader.ReadBoolean();
 
-				if (ch != null)
-				{
-					if (player.isAdmin)
-					{
-						ch.isLocked = locked;
-						BinaryWriter writer = BeginSend(Packet.ResponseLockChannel);
-						writer.Write(ch.id);
-						writer.Write(locked);
-						EndSend(true);
-					}
-					else
-					{
-						player.LogError("RequestLockChannel(" + ch.id + ", " + locked + ") without authorization", null);
-						RemovePlayer(player);
-					}
-				}
-				break;
-			}
-			case Packet.RequestHTTPGet:
-			{
-				if (player.stage == TcpProtocol.Stage.WebBrowser)
-				{
-					// string requestText = reader.ReadString();
-					// Example of an HTTP request:
-					// GET / HTTP/1.1
-					// Host: 127.0.0.1:5127
-					// Connection: keep-alive
-					// User-Agent: Chrome/47.0.2526.80
+                        if (ch != null)
+                        {
+                            if (player.isAdmin)
+                            {
+                                ch.isLocked = locked;
+                                BinaryWriter writer = BeginSend(Packet.ResponseLockChannel);
+                                writer.Write(ch.id);
+                                writer.Write(locked);
+                                EndSend(true);
+                            }
+                            else
+                            {
+                                player.LogError("RequestLockChannel(" + ch.id + ", " + locked + ") without authorization", null);
+                                RemovePlayer(player);
+                            }
+                        }
+                        break;
+                    }
+                case Packet.RequestHTTPGet:
+                    {
+                        if (player.stage == TcpProtocol.Stage.WebBrowser)
+                        {
+                            // string requestText = reader.ReadString();
+                            // Example of an HTTP request:
+                            // GET / HTTP/1.1
+                            // Host: 127.0.0.1:5127
+                            // Connection: keep-alive
+                            // User-Agent: Chrome/47.0.2526.80
 
-					StringBuilder sb = new StringBuilder();
+                            StringBuilder sb = new StringBuilder();
 
-					// Server name
-					sb.Append("Name: ");
-					sb.AppendLine(name);
+                            // Server name
+                            sb.Append("Name: ");
+                            sb.AppendLine(name);
 
-					// Number of connected clients
-					sb.Append("Clients: ");
-					sb.AppendLine(playerCount.ToString());
+                            // Number of connected clients
+                            sb.Append("Clients: ");
+                            sb.AppendLine(playerCount.ToString());
 
-					// Detailed list of clients
-					for (int i = 0, count = 0; i < mPlayerList.size; ++i)
-					{
-						TcpPlayer p = (TcpPlayer)mPlayerList[i];
+                            // Detailed list of clients
+                            for (int i = 0, count = 0; i < mPlayerList.size; ++i)
+                            {
+                                TcpPlayer p = (TcpPlayer)mPlayerList[i];
 
-						if (p.stage == TcpProtocol.Stage.Connected)
-						{
-							sb.Append(++count);
-							sb.Append(" ");
-							sb.AppendLine(p.name);
-						}
-					}
+                                if (p.stage == TcpProtocol.Stage.Connected)
+                                {
+                                    sb.Append(++count);
+                                    sb.Append(" ");
+                                    sb.AppendLine(p.name);
+                                }
+                            }
 
-					// Create the header indicating that the connection should be severed after receiving the data
-					string text = sb.ToString();
-					sb = new StringBuilder();
-					sb.AppendLine("HTTP/1.1 200 OK");
-					sb.AppendLine("Server: TNet 3");
-					sb.AppendLine("Content-Length: " + text.Length);
-					sb.AppendLine("Content-Type: text/plain");
-					sb.AppendLine("Connection: Closed\n");
-					sb.Append(text);
+                            // Create the header indicating that the connection should be severed after receiving the data
+                            string text = sb.ToString();
+                            sb = new StringBuilder();
+                            sb.AppendLine("HTTP/1.1 200 OK");
+                            sb.AppendLine("Server: TNet 3");
+                            sb.AppendLine("Content-Length: " + text.Length);
+                            sb.AppendLine("Content-Type: text/plain");
+                            sb.AppendLine("Connection: Closed\n");
+                            sb.Append(text);
 
-					// Send the response
-					mBuffer = Buffer.Create();
-					BinaryWriter bw = mBuffer.BeginWriting(false);
-					bw.Write(Encoding.ASCII.GetBytes(sb.ToString()));
-					player.SendTcpPacket(mBuffer);
-					mBuffer.Recycle();
-					mBuffer = null;
-				}
-				break;
-			}
-			case Packet.RequestRenameServer:
-			{
-				name = reader.ReadString();
-				break;
-			}
-			default:
-			{
-				if (player.channels.size != 0 && (int)request < (int)Packet.UserPacket)
-				{
-					// Other packets can only be processed while in a channel
-					if (request >= Packet.ForwardToAll && request < Packet.ForwardToPlayer)
-					{
-						ProcessForwardPacket(player, buffer, reader, request, reliable);
-					}
-					else
-					{
-						ProcessChannelPacket(player, buffer, reader, request);
-					}
-				}
-				else if (onCustomPacket != null)
-				{
-					onCustomPacket(player, buffer, reader, request, reliable);
-				}
-				break;
-			}
-		}
-		return true;
-	}
+                            // Send the response
+                            mBuffer = Buffer.Create();
+                            BinaryWriter bw = mBuffer.BeginWriting(false);
+                            bw.Write(Encoding.ASCII.GetBytes(sb.ToString()));
+                            player.SendTcpPacket(mBuffer);
+                            mBuffer.Recycle();
+                            mBuffer = null;
+                        }
+                        break;
+                    }
+                case Packet.RequestRenameServer:
+                    {
+                        name = reader.ReadString();
+                        break;
+                    }
+                case Packet.SelfServerPacket:
+                    {
+                        ServerDateManager.ReceiveFunctionFromClient(player, reader);
+                        break;
+                    }
+                default:
+                    {
+                        if (player.channels.size != 0 && (int)request < (int)Packet.UserPacket)
+                        {
+                            // Other packets can only be processed while in a channel
+                            if (request >= Packet.ForwardToAll && request < Packet.ForwardToPlayer)
+                            {
+                                ProcessForwardPacket(player, buffer, reader, request, reliable);
+                            }
+                            else
+                            {
+                                ProcessChannelPacket(player, buffer, reader, request);
+                            }
+                        }
+                        else if (onCustomPacket != null)
+                        {
+                            onCustomPacket(player, buffer, reader, request, reliable);
+                        }
+                        break;
+                    }
+            }
+            return true;
+        }
 
 	/// <summary>
 	/// Set an alias and check it against the ban list.

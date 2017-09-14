@@ -17,7 +17,6 @@ namespace GamelolLoginServer.Database
 
         public LoginMessageDatabase() {
             mySqlConnection = DatabaseConnnection.Instcance.GetMyConnection();
-
         }
 
         /// <summary>
@@ -33,9 +32,10 @@ namespace GamelolLoginServer.Database
             {
                 mySqlConnection.Open();
                 reader = cmd.ExecuteReader();
-                playerLoginMessage = new PlayerLoginMessage();
+                
                 while (reader.Read())
                 {
+                    playerLoginMessage = new PlayerLoginMessage();
                     playerLoginMessage.LoginId = int.Parse(reader[0].ToString());
                     playerLoginMessage.LoginAccount = int.Parse(reader[1].ToString());
                     playerLoginMessage.LoginPassword = reader[2].ToString();
