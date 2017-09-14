@@ -34,7 +34,7 @@ namespace GamelolLoginServer.DataMessage
         /// </summary>
         public int LoginAccount {
             get {
-                return LoginAccount;
+                return _loginAccount;
             }
             set {
                 _loginAccount = value;

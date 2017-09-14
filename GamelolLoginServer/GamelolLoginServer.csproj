@@ -55,7 +55,7 @@
   <ItemGroup>
     <Reference Include="LitJson, Version=0.7.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\Desktop\LitJson.dll</HintPath>
+      <HintPath>.\LitJson.dll</HintPath>
     </Reference>
     <Reference Include="MySql.Data">
       <HintPath>..\..\..\..\..\Downloads\HoverTreeCSharpMysql\v4.5\MySql.Data.dll</HintPath>

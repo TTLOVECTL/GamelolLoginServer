@@ -723,7 +723,6 @@ namespace TNet
         SelfClientPacket,
 
         SelfServerPacket,
-
         /// <summary>
         /// Begin custom packets here.
         /// </summary>
