@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
-
+using GamelolLoginServer.Util;
 namespace GamelolLoginServer.Database
 {
     /// <summary>
@@ -22,7 +22,8 @@ namespace GamelolLoginServer.Database
         }
 
         private void InitConnection() {
-            string m_string_sqlcon = "server=localhost;user id=root;password=tt19951010;database=db_gamelol";
+            string m_string_sqlcon = "server="+ConfigurationSetting.GetConfigurationValue("databaseUrl") +";user id="+ ConfigurationSetting.GetConfigurationValue("databaseUsername") +
+                ";password="+ ConfigurationSetting.GetConfigurationValue("databasePassword") + ";database="+ ConfigurationSetting.GetConfigurationValue("databaseName");
             mySqlConnection = new MySqlConnection(m_string_sqlcon);
         }
 

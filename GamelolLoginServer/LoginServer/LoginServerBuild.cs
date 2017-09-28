@@ -4,7 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Net;
-
+using GamelolLoginServer.Util;
 
 namespace GamelolLoginServer.LoginServer
 {
@@ -22,12 +22,11 @@ namespace GamelolLoginServer.LoginServer
         {
 
             string name = "TNet Server";
-            int tcpPort = 1998;
-            int udpPort = 1996;
+            int tcpPort =int.Parse( ConfigurationSetting.GetConfigurationValue("tcpPort"));
+            int udpPort = int.Parse(ConfigurationSetting.GetConfigurationValue("udpPort")); ;
             string lobbyAddress = null;
-            int lobbyPort = 1997;
+            int lobbyPort = int.Parse(ConfigurationSetting.GetConfigurationValue("lobbyPort"));
             bool tcpLobby = false;
-
             Start(name, tcpPort, udpPort, lobbyAddress, lobbyPort, tcpLobby);
         }
 

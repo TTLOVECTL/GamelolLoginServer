@@ -9,6 +9,9 @@ using LitJson;
 using GamelolLoginServer.InteractiveMessage;
 using GamelolLoginServer.Database;
 using GamelolLoginServer.DataMessage;
+using LogServerDataMessage;
+using RpgGame.NetConnection;
+using GamelolLoginServer.ServerLog;
 namespace GamelolLoginServer.LoginServer
 {
     public class ServerDateManager
@@ -52,6 +55,9 @@ namespace GamelolLoginServer.LoginServer
                 message.LoginAccount = loginMessage.account;
                 message.LoginPlayer = playerId;
                 loginMessageDatabase.InsertPlayerLoginMessage(message);
+
+                //注册日志记录
+
             }
 
             player.EndSend();
@@ -61,7 +67,6 @@ namespace GamelolLoginServer.LoginServer
         public static void LoginLogic(TcpPlayer player, LoginMessage loginMessage)
         {
             
-
             LoginMessageDatabase loginMessageDatabase = new LoginMessageDatabase();
             BinaryWriter write = player.BeginSend(Packet.SelfClientPacket);
             PlayerLoginMessage message = loginMessageDatabase.GetPlayerLoginMessageByAccount(loginMessage.account);
@@ -70,6 +75,11 @@ namespace GamelolLoginServer.LoginServer
             {
                 if (message.LoginPassword.Equals(loginMessage.password))
                 {
+                    //记录登陆日志
+                    LoginLogMessage loginLogMessage = new LoginLogMessage();
+                    loginLogMessage.loginIP = player.address;
+                    loginLogMessage.loginPlayerId = message.LoginPlayer;
+                    NetWorkScript.Instance.write((int)LogType.LOGIN_LOG,0,0,loginLogMessage);
                     //have someting to do
                     write.Write(1);
                 }

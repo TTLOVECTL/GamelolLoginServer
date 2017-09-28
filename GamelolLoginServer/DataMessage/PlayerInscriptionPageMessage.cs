@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GamelolLoginServer.DataMessage
 {
+    /// <summary>
+    /// 符文页信息
+    /// </summary>
     public class PlayerInscriptionPageMessage
     {
         private int _inscriptionPageId;

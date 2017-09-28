@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using GamelolLoginServer.ServerLog.LogMessage;
+using LogServerDataMessage;
 using GamelolLoginServer.TextFile;
 namespace GamelolLoginServer.ServerLog.LogSysytem
 {

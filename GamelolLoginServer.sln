@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.10
+VisualStudioVersion = 15.0.26430.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GamelolLoginServer", "GamelolLoginServer\GamelolLoginServer.csproj", "{FB52C996-CCA6-44FA-B29C-010DDF77620D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogServerDataMessage", "LogServerDataMessage\LogServerDataMessage.csproj", "{6882133C-C4B1-4613-ADE1-475CD47224E8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{FB52C996-CCA6-44FA-B29C-010DDF77620D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FB52C996-CCA6-44FA-B29C-010DDF77620D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FB52C996-CCA6-44FA-B29C-010DDF77620D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6882133C-C4B1-4613-ADE1-475CD47224E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6882133C-C4B1-4613-ADE1-475CD47224E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6882133C-C4B1-4613-ADE1-475CD47224E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6882133C-C4B1-4613-ADE1-475CD47224E8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

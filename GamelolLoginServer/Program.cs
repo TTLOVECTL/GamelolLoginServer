@@ -8,20 +8,19 @@ using GamelolLoginServer.LoginServer;
 using GamelolLoginServer.DataMessage;
 using GamelolLoginServer.Database;
 using GamelolLoginServer.TextFile;
-using GamelolLoginServer.ServerLog.LogMessage;
 using GamelolLoginServer.ServerLog.LogSysytem;
+using GamelolLoginServer.Util;
 namespace GamelolLoginServer
 {
     class Program
     {
         static void Main(string[] args)
         {
-            new LoginServerBuild();
-            //LoginLogMessage loginLogMessage = new LoginLogMessage();
-            //loginLogMessage.loginPlayerId = 1995;
-            //loginLogMessage.loginIP="192.168.6.114";
-            //LoginLogSystem.Instance.LoginLogWrite(loginLogMessage);
-               
+            //new LoginServerBuild();
+            // Console.WriteLine( ConfigurationSetting.GetConfigurationValue("123"));
+            //SystemInfo info = new SystemInfo();
+            //Console.WriteLine(info.PhysicalMemory);
+            
         }
     }
 }

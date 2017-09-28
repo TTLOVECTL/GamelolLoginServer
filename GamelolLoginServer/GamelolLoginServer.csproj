@@ -86,10 +86,14 @@
     <Compile Include="LoginServer\ServerDateManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ServerLog\LogMessage\LoginLogMessage.cs" />
-    <Compile Include="ServerLog\LogMessage\SystemLogMessage.cs" />
+    <Compile Include="ServerLog\AceFrame\ByteArray.cs" />
+    <Compile Include="ServerLog\AceFrame\MessageManager.cs" />
+    <Compile Include="ServerLog\AceFrame\NetWorkScript.cs" />
+    <Compile Include="ServerLog\AceFrame\SerializeUtil.cs" />
+    <Compile Include="ServerLog\AceFrame\SocketModel.cs" />
     <Compile Include="ServerLog\LogSysytem\LoginLogSystem.cs" />
-    <Compile Include="ServerLog\LogType.cs" />
+    <Compile Include="ServerLog\LogSysytem\SystemInfo.cs" />
+    <Compile Include="ServerLog\LogSysytem\SystemLogSystem.cs" />
     <Compile Include="TextFile\TextFileRead.cs" />
     <Compile Include="TextFile\TextFileWrite.cs" />
     <Compile Include="TNet\Common\DataNode.cs" />
@@ -133,7 +137,9 @@
     <Compile Include="XmlFile\SavePlayerData.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="App.config">
+      <SubType>Designer</SubType>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
@@ -147,6 +153,12 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="LoginServer\readme.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LogServerDataMessage\LogServerDataMessage.csproj">
+      <Project>{6882133c-c4b1-4613-ade1-475cd47224e8}</Project>
+      <Name>LogServerDataMessage</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

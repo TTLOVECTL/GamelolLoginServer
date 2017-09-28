@@ -10,10 +10,14 @@ namespace GamelolLoginServer.Util
 {
     public class ConfigurationSetting
     {
+        /// <summary>
+        ///获取配置文件的值
+        /// </summary>
+        /// <param name="keyname"></param>
+        /// <returns></returns>
         public static string GetConfigurationValue(string keyname) {
-            System.Configuration.AppSettingsReader appSettingsReader = new AppSettingsReader();
-            //return System.con.AppSettings[keyname];
-            return null;
+            string keyValue= ConfigurationManager.AppSettings[keyname];
+            return keyValue;
 
         }
     }

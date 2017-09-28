@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GamelolLoginServer.ServerLog.LogMessage
+namespace LogServerDataMessage
 {
     /// <summary>
     /// 登录日志系统的信息
@@ -12,12 +12,10 @@ namespace GamelolLoginServer.ServerLog.LogMessage
     [System.Serializable]
     public class LoginLogMessage
     {
-       
-
         /// <summary>
         ///登录时间
         /// </summary>
-        public string loginTime;
+        public DateTime loginTime;
 
         /// <summary>
         /// 登录玩家ID
@@ -34,7 +32,8 @@ namespace GamelolLoginServer.ServerLog.LogMessage
         /// </summary>
         public LoginLogMessage()
         {
-            loginTime = DateTime.Now.ToString("yyyy-MM-dd") + "-" + DateTime.Now.ToString("hh:mm:ss");
+            //loginTime = DateTime.Now.ToString("yyyy-MM-dd") + "-" + DateTime.Now.ToString("hh:mm:ss");
+            loginTime = DateTime.Now;
         }
     }
 }

@@ -9,6 +9,9 @@ using GamelolLoginServer.DataMessage;
 
 namespace GamelolLoginServer.Database
 {
+    /// <summary>
+    /// 玩家基本符文页信息数据库读取
+    /// </summary>
     public class InscriptionPageMessageDatabase
     {
         private MySqlConnection mySqlConnection = null;

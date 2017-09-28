@@ -8,6 +8,9 @@ using MySql.Data.MySqlClient;
 
 namespace GamelolLoginServer.Database
 {
+    /// <summary>
+    /// 玩家符文信息数据库的读写
+    /// </summary>
     public class InscriptionMessageDatabase
     {
         private MySqlConnection mySqlConnection = null;
