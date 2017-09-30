@@ -30,6 +30,7 @@ namespace RpgGame.NetConnection
         {
             get
             {
+               
                 if (instance == null)
                 {
                     instance = new NetWorkScript();
@@ -44,7 +45,7 @@ namespace RpgGame.NetConnection
             try
             {
                 socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                socket.Connect(ConfigurationSetting.GetConfigurationValue("logServerIp"), int.Parse(ConfigurationSetting.GetConfigurationValue("logServerIp")) );
+                socket.Connect(ConfigurationSetting.GetConfigurationValue("logServerIp"), int.Parse(ConfigurationSetting.GetConfigurationValue("logServerPort")) );
                 socket.BeginReceive(readBuff, 0, 1024, SocketFlags.None, ReceiveCallBack, readBuff);
                 Console.WriteLine("连接服务器成功");
             }

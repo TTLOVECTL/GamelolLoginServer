@@ -30,14 +30,10 @@ namespace LogServerDataMessage
         public float cpuLoad;
 
         /// <summary>
-        /// 剩余可用内存
+        /// 内存使用率
         /// </summary>
-        public long memoryAvailable;
+        public float memoryAvailable;
 
-        /// <summary>
-        /// 剩余物理内存
-        /// </summary>
-        public long physicalMemory;
 
         public SystemLogMessage()
         {
