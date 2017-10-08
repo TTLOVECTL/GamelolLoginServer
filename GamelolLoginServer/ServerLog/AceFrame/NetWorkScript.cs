@@ -26,16 +26,18 @@ namespace RpgGame.NetConnection
 
         private List<byte> cache = new List<byte>();
 
+        private static bool isInit = true;
         public static NetWorkScript Instance
         {
             get
             {
-               
-                if (instance == null)
+                if (instance == null||!isInit)
                 {
                     instance = new NetWorkScript();
                     instance.init();
                 }
+
+
                 return instance;
             }
         }
@@ -48,10 +50,12 @@ namespace RpgGame.NetConnection
                 socket.Connect(ConfigurationSetting.GetConfigurationValue("logServerIp"), int.Parse(ConfigurationSetting.GetConfigurationValue("logServerPort")) );
                 socket.BeginReceive(readBuff, 0, 1024, SocketFlags.None, ReceiveCallBack, readBuff);
                 Console.WriteLine("连接服务器成功");
+                isInit = true;
             }
             catch (Exception e)
             {
                 Console.WriteLine("连接服务器失败" + e.Message);
+                isInit = false;
             }
         }
 
@@ -75,7 +79,7 @@ namespace RpgGame.NetConnection
             }
             catch (Exception e)
             {
-                Console.WriteLine("网络错误，请重新登录" + e.Message);
+               // Console.WriteLine("网络错误，请重新登录" + e.Message);
             }
         }
 

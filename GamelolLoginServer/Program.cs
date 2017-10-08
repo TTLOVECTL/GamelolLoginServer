@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using GamelolLoginServer.LoginServer;
 using GamelolLoginServer.ServerLog.LogSysytem;
+using GamelolLoginServer.XmlFile;
 namespace GamelolLoginServer
 {
     class Program

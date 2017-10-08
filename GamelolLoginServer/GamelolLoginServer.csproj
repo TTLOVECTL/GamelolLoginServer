@@ -81,6 +81,7 @@
     <Compile Include="DataMessage\PlayerInscriptionMessage.cs" />
     <Compile Include="DataMessage\PlayerInscriptionPageMessage.cs" />
     <Compile Include="DataMessage\PlayerLoginMessage.cs" />
+    <Compile Include="InteractiveMessage\CenterMessage.cs" />
     <Compile Include="InteractiveMessage\LoginMessage.cs" />
     <Compile Include="LoginServer\LoginServerBuild.cs" />
     <Compile Include="LoginServer\ServerDateManager.cs" />

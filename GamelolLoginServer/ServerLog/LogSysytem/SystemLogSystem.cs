@@ -16,7 +16,7 @@ namespace GamelolLoginServer.ServerLog.LogSysytem
 
         private static PerformanceCounter cpu;
 
-        private MEMORY_INFO menInfor;
+        //private MEMORY_INFO MemInfo;
 
         [DllImport("kernel32")]
         public static extern void GetSystemDirectory(StringBuilder SysDir, int count);
@@ -55,8 +55,8 @@ namespace GamelolLoginServer.ServerLog.LogSysytem
             {
                 SystemLogMessage systemLogMessage = new SystemLogMessage();
                 GlobalMemoryStatus(ref MemInfo);
-                //Console.Write(menInfor.dwMemoryLoad.ToString()+" ");
-                systemLogMessage.memoryAvailable =float.Parse( menInfor.dwMemoryLoad.ToString()) / 100;
+                string a = MemInfo.dwMemoryLoad.ToString();
+                systemLogMessage.memoryAvailable =float.Parse(a)/100;
                 var percentage = cpu.NextValue();
                 systemLogMessage.cpuLoad = percentage / 100;
                 systemLogMessage.serverId = int.Parse(ConfigurationSetting.GetConfigurationValue("serverId"));

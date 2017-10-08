@@ -12,6 +12,7 @@ using GamelolLoginServer.DataMessage;
 using LogServerDataMessage;
 using RpgGame.NetConnection;
 using GamelolLoginServer.ServerLog;
+using GamelolLoginServer.Util;
 namespace GamelolLoginServer.LoginServer
 {
     public class ServerDateManager
@@ -75,13 +76,18 @@ namespace GamelolLoginServer.LoginServer
             {
                 if (message.LoginPassword.Equals(loginMessage.password))
                 {
-                    //记录登陆日志
+                    //记录登陆日志，并将器转发给日志服务器
                     LoginLogMessage loginLogMessage = new LoginLogMessage();
                     loginLogMessage.loginIP = player.address;
                     loginLogMessage.loginPlayerId = message.LoginPlayer;
                     NetWorkScript.Instance.write((int)LogType.LOGIN_LOG,0,0,loginLogMessage);
-                    //have someting to do
                     write.Write(1);
+
+                    CenterMessage centerMessage = new CenterMessage();
+                    centerMessage.centerServerIp = ConfigurationSetting.GetConfigurationValue("centerServerIP");
+                    centerMessage.centerServerPort = int.Parse(ConfigurationSetting.GetConfigurationValue("centerServerPort"));
+                    string messageStr = JsonMapper.ToJson(message);
+                    write.Write(messageStr);
                 }
                 else {
                     write.Write(3);

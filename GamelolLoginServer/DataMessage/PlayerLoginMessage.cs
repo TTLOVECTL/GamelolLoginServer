@@ -25,7 +25,7 @@ namespace GamelolLoginServer.DataMessage
         public int LoginId
         {
             get {
-                return LoginId;
+                return _loginId;
             }
             set {
                 _loginId = value;
