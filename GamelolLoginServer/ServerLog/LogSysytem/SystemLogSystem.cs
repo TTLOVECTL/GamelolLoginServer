@@ -62,7 +62,7 @@ namespace GamelolLoginServer.ServerLog.LogSysytem
                 systemLogMessage.serverId = int.Parse(ConfigurationSetting.GetConfigurationValue("serverId"));
                 systemLogMessage.serverName = ConfigurationSetting.GetConfigurationValue("serverName");
                 NetWorkScript.Instance.write((int)LogType.SYSTEM_LOG,0,0,systemLogMessage);
-                System.Threading.Thread.Sleep(2000);
+                System.Threading.Thread.Sleep(60000);
             }
            
         }
