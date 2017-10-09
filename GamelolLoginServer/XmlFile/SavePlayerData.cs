@@ -7,6 +7,9 @@ using GamelolLoginServer.DataMessage;
 using GamelolLoginServer.Database;
 using System.Data;
 using System.Xml;
+using System.Web;
+using System.Net;
+using System.IO;
 
 namespace GamelolLoginServer.XmlFile
 {

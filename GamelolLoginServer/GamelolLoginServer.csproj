@@ -92,10 +92,7 @@
     <Compile Include="ServerLog\AceFrame\NetWorkScript.cs" />
     <Compile Include="ServerLog\AceFrame\SerializeUtil.cs" />
     <Compile Include="ServerLog\AceFrame\SocketModel.cs" />
-    <Compile Include="ServerLog\LogSysytem\LoginLogSystem.cs" />
     <Compile Include="ServerLog\LogSysytem\SystemLogSystem.cs" />
-    <Compile Include="TextFile\TextFileRead.cs" />
-    <Compile Include="TextFile\TextFileWrite.cs" />
     <Compile Include="TNet\Common\DataNode.cs" />
     <Compile Include="TNet\Common\TNBuffer.cs" />
     <Compile Include="TNet\Common\TNDatagram.cs" />

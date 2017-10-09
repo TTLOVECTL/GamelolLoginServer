@@ -86,7 +86,8 @@ namespace GamelolLoginServer.LoginServer
                     CenterMessage centerMessage = new CenterMessage();
                     centerMessage.centerServerIp = ConfigurationSetting.GetConfigurationValue("centerServerIP");
                     centerMessage.centerServerPort = int.Parse(ConfigurationSetting.GetConfigurationValue("centerServerPort"));
-                    string messageStr = JsonMapper.ToJson(message);
+                    string messageStr = JsonMapper.ToJson(centerMessage);
+                    Console.WriteLine(messageStr);
                     write.Write(messageStr);
                 }
                 else {
