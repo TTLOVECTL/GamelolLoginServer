@@ -58,7 +58,7 @@
       <HintPath>.\LitJson.dll</HintPath>
     </Reference>
     <Reference Include="MySql.Data">
-      <HintPath>..\..\..\..\..\Downloads\HoverTreeCSharpMysql\v4.5\MySql.Data.dll</HintPath>
+      <HintPath>.\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -72,6 +72,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AceNetFrame\ace\AbsHandleCenter.cs" />
+    <Compile Include="AceNetFrame\ace\auto\LengthEncoding.cs" />
+    <Compile Include="AceNetFrame\ace\auto\MessageEncoding.cs" />
+    <Compile Include="AceNetFrame\ace\auto\SocketModel.cs" />
+    <Compile Include="AceNetFrame\ace\ByteArray.cs" />
+    <Compile Include="AceNetFrame\ace\Delegate.cs" />
+    <Compile Include="AceNetFrame\ace\NetServer.cs" />
+    <Compile Include="AceNetFrame\ace\SendtoClient.cs" />
+    <Compile Include="AceNetFrame\ace\SerializeUtil.cs" />
+    <Compile Include="AceNetFrame\ace\UserToken.cs" />
+    <Compile Include="AceNetFrame\ace\UserTokenPool.cs" />
     <Compile Include="Database\BaseMessageDatabase.cs" />
     <Compile Include="Database\DatabaseConnnection.cs" />
     <Compile Include="Database\InscriptionMessageDatabase.cs" />
@@ -83,7 +94,12 @@
     <Compile Include="DataMessage\PlayerLoginMessage.cs" />
     <Compile Include="InteractiveMessage\CenterMessage.cs" />
     <Compile Include="InteractiveMessage\LoginMessage.cs" />
+    <Compile Include="LoginServer\HandlerCenter.cs" />
+    <Compile Include="LoginServer\HandlerInterface.cs" />
+    <Compile Include="LoginServer\HandlerTool\LoginHandler.cs" />
+    <Compile Include="LoginServer\HandlerTool\RegisterHandler.cs" />
     <Compile Include="LoginServer\LoginServerBuild.cs" />
+    <Compile Include="LoginServer\LoginServerStart.cs" />
     <Compile Include="LoginServer\ServerDateManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
