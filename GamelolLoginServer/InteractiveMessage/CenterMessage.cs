@@ -13,5 +13,6 @@ namespace GamelolLoginServer.InteractiveMessage
 
         public int centerServerPort;
 
+        public int loginPlayerId;
     }
 }

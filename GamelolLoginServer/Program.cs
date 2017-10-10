@@ -13,8 +13,7 @@ namespace GamelolLoginServer
     {
         static void Main(string[] args)
         {
-            //启动游戏登录服务器
-            new LoginServerBuild();
+            LoginServerStart.StartServer();
             SystemLogSystem.Instance.SendMessageToLogServer();
 
         }

@@ -37,12 +37,12 @@ namespace GamelolLoginServer.LoginServer.HandlerTool
                     loginLogMessage.loginPlayerId = message1.LoginPlayer;
                     RpgGame.NetConnection.NetWorkScript.Instance.write((int)LogType.LOGIN_LOG, 0, 0, loginLogMessage);
                     socketModel.command = 1;
-
+                    XmlFile.SavePlayerData.SavaDataToXml(message1.LoginPlayer);
                     CenterMessage centerMessage = new CenterMessage();
                     centerMessage.centerServerIp = ConfigurationSetting.GetConfigurationValue("centerServerIP");
                     centerMessage.centerServerPort = int.Parse(ConfigurationSetting.GetConfigurationValue("centerServerPort"));
+                    centerMessage.loginPlayerId = message1.LoginPlayer;
                     string messageStr = JsonMapper.ToJson(centerMessage);
-                    Console.WriteLine(messageStr);
                     socketModel.message = messageStr;
                 }
                 else

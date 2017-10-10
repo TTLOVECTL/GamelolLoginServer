@@ -21,13 +21,13 @@ namespace GamelolLoginServer.LoginServer
 
         public override void ClientClose(UserToken token, string error)
         {
-            Console.WriteLine("客户端"+token.clientSocket.ToString()+"断开了与登录服务器的连接");
+            Console.WriteLine("客户端"+token.clientSocket.RemoteEndPoint.ToString()+"断开了与登录服务器的连接");
         }
 
         public override void MessageRecive(UserToken token, object message)
         {
             SocketModel socketModel = (SocketModel)message;
-            switch (socketModel.type) {
+            switch (socketModel.area) {
                 case 1:
                     registerHander.MessageRecevie(token,socketModel);
                     break;

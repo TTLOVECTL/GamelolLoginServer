@@ -10,6 +10,7 @@ using System.Xml;
 using System.Web;
 using System.Net;
 using System.IO;
+using GamelolLoginServer.Util;
 
 namespace GamelolLoginServer.XmlFile
 {
@@ -70,12 +71,12 @@ namespace GamelolLoginServer.XmlFile
 
             try
             {
-                xmlDoc.Save("D://"+playerid.ToString()+".xml");
+                xmlDoc.Save(ConfigurationSetting.GetConfigurationValue("xmlPath")+playerid.ToString()+".xml");
             }
             catch (Exception e)
             {
                 //显示错误信息  
-                Console.WriteLine(e.Message);
+                Console.WriteLine("保存失败"+e.Message);
             }
         }
 

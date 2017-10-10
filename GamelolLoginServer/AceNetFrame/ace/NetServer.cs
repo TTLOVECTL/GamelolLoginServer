@@ -126,7 +126,7 @@ namespace AceNetFrame.ace
         private void ProcessAccept(SocketAsyncEventArgs e)
         {
             UserToken userToken = userPool.pop();
-            Console.WriteLine("用户登录服务器");
+            Console.WriteLine("用户"+ e.AcceptSocket.RemoteEndPoint.ToString() + "连接了服务器服务器");
             userToken.clientSocket = e.AcceptSocket;
             StartReceive(userToken);
             StartAccept(e);

@@ -38,11 +38,11 @@ namespace GamelolLoginServer.LoginServer.HandlerTool
                 socketModel.command = 1;
                 SendtoClient.write(token, socketModel);
                 int playerId = new BaseMessageDatabase().InitPlayerBaseMessage();
-                PlayerLoginMessage message = new PlayerLoginMessage();
-                message.LoginPassword = loginMessage.password;
-                message.LoginAccount = loginMessage.account;
-                message.LoginPlayer = playerId;
-                loginMessageDatabase.InsertPlayerLoginMessage(message);
+                PlayerLoginMessage message1 = new PlayerLoginMessage();
+                message1.LoginPassword = loginMessage.password;
+                message1.LoginAccount = loginMessage.account;
+                message1.LoginPlayer = playerId;
+                loginMessageDatabase.InsertPlayerLoginMessage(message1);
             }
         }
     }

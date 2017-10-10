@@ -79,7 +79,7 @@ namespace RpgGame.NetConnection
             }
             catch (Exception e)
             {
-               // Console.WriteLine("网络错误，请重新登录" + e.Message);
+                Console.WriteLine("网络错误，请重新登录" + e.Message);
             }
         }
 
